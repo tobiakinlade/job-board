@@ -21,9 +21,11 @@ model User {
   updatedAt DateTime @updatedAt
   accounts Account[]
   sessions Session[]
+  company Boolean @default(false)
+  jobs Job[]
 }
 
-model VerificationToke {
+model VerificationToken {
   identifier String
   token String @unique
   expires DateTime
@@ -57,4 +59,16 @@ model Session {
   userId String
   expires DateTime
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Job {
+  id Int @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  title String?
+  description String?
+  salary String?
+  location String?
+  published Boolean @default(true)
+  author User @relation(fields: [authorId], references: [id])
+  authorId String
 }
