@@ -1,6 +1,7 @@
 import { getJobsPosted, getUser } from 'lib/data';
-import { getSession, useSession } from 'next-auth/react';
 import prisma from 'lib/prisma';
+import { getSession, useSession } from 'next-auth/react';
+
 import Jobs from 'components/Jobs';
 
 export default function Dashboard({ user, jobs }) {
@@ -31,7 +32,7 @@ export default function Dashboard({ user, jobs }) {
 
 export async function getServerSideProps(context) {
   const session = await getSession(context);
-  let user = await getUser(session.user.id, primsa);
+  let user = await getUser(session.user.id, prisma);
   user = JSON.parse(JSON.stringify(user));
 
   let jobs = await getJobsPosted(user.id, prisma);

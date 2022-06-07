@@ -17,6 +17,11 @@ export default function Job({ job }) {
       <div className='mb-4 mt-20'>
         <div className='pl-16 pr-16 -mt-6'>
           <p className='textbase font-normal mt-3'>{job.description}</p>
+          <div className='mt-20 flex justify-center'>
+           <Link href={`/job/${job.id}/apply`}>
+           <button> Apply to this job</button>
+           </Link>
+          </div>
           <div className='mt-4'>
             <h4 className='inline'>Posted by</h4>
             <div className='inline'>
@@ -24,10 +29,7 @@ export default function Job({ job }) {
                 <span>
                   <Link href={`/company/${job.author.id}`}>
                     <a>
-                      <span className='text-base font-medium color-primary underline'>
-                        {' '}
-                        {job.author.name}
-                      </span>
+                      <span> {job.author.name}</span>
                     </a>
                   </Link>
                 </span>
