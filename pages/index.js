@@ -1,12 +1,12 @@
 import Jobs from 'components/Jobs';
-import { getJobs } from 'lib/data';
+import { getJobs, getUser } from 'lib/data';
 import prisma from 'lib/prisma';
-import { useSession } from 'next-auth/react';
+import { getSession, useSession } from 'next-auth/react';
 import Head from 'next/head';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 
-export default function Home({ jobs }) {
+export default function Home({ jobs, user }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   if (session && !session.user.name) {
@@ -24,18 +24,50 @@ export default function Home({ jobs }) {
         </div>
         {!session && <a href='/api/auth/signin'>Login</a>}
         <Jobs jobs={jobs} />
+        {session && (
+          <>
+            <p className='mb-10 text-2xl font-normal'>
+              Welcome, {user.name}
+              {user.company && (
+                <span className='bg-black text-white uppercase text-sm p-2'>
+                  Company
+                </span>
+              )}
+            </p>
+            {user.company ? (
+              <>
+                <button className='border px-8 py-2 mt-5 font-bold rounded-full bg-black text-white border-black'>
+                  click here to post a new job
+                </button>
+                <button className='ml-5 border px-8 py-2 mt-t font-bold rounded-full bg-black text-white border-black'>
+                  see all the jobs you posted
+                </button>
+              </>
+            ) : (
+              <>
+                <button className='ml-5 border px-8 py-2 mt-t font-bold rounded-full bg-black text-white border-black'>
+                  see all the jobs you applied to
+                </button>
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
 }
 
 export async function getServerSideProps(context) {
+  const session = await getSession(context);
   let jobs = await getJobs(prisma);
   jobs = JSON.parse(JSON.stringify(jobs));
 
+  let user = await getUser(session.user.id, prisma);
+  user = JSON.parse(JSON.stringify(user));
   return {
     props: {
       jobs,
+      user,
     },
   };
 }
