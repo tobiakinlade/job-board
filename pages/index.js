@@ -4,6 +4,7 @@ import prisma from 'lib/prisma';
 import { getSession, useSession } from 'next-auth/react';
 import Head from 'next/head';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 export default function Home({ jobs, user }) {
@@ -36,9 +37,12 @@ export default function Home({ jobs, user }) {
             </p>
             {user.company ? (
               <>
-                <button className='border px-8 py-2 mt-5 font-bold rounded-full bg-black text-white border-black'>
-                  click here to post a new job
-                </button>
+                <Link href={`/new`}>
+                  <button className='border px-8 py-2 mt-5 font-bold rounded-full bg-black text-white border-black'>
+                    click here to post a new job
+                  </button>
+                </Link>
+
                 <button className='ml-5 border px-8 py-2 mt-t font-bold rounded-full bg-black text-white border-black'>
                   see all the jobs you posted
                 </button>
