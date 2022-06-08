@@ -4,6 +4,7 @@ import { getSession, useSession } from 'next-auth/react';
 import Link from 'next/link';
 
 import Jobs from 'components/Jobs';
+import Job from 'components/Job';
 
 export default function Dashboard({ user, jobs, applications }) {
   const { data: session, status } = useSession();
@@ -26,7 +27,42 @@ export default function Dashboard({ user, jobs, applications }) {
       </div>
 
       {user.company ? (
-        <Jobs jobs={jobs} isDashboard={true} />
+        <div>
+          {jobs.map((job, index) => (
+            <>
+              <Job key={index} job={job} isDashboard={true} />
+
+              <div className='mb-4 mt-20'>
+                <div className='pl-16 pr-16 -mt-6'>
+                  {job.applications.length === 0 ? (
+                    <p className='mb-10 text-2xl font-normal'>
+                      No applications so far 😞
+                    </p>
+                  ) : (
+                    <p className='mb-10 text-2xl font-normal'>
+                      {job.applications.length} applications
+                    </p>
+                  )}
+
+                  {job.applications?.map((application, index) => (
+                    <>
+                      <h2 className='text-base font-normal mt-3'>
+                        <span className='text-base font-bold mt-3 mr-3'>
+                          {application.author.name}
+                        </span>
+                        {application.author.email}
+                      </h2>
+                      <p className='text-lg font-normal mt-2 mb-3'>
+                        {application.coverLetter}
+                      </p>
+                      <hr />
+                    </>
+                  ))}
+                </div>
+              </div>
+            </>
+          ))}
+        </div>
       ) : (
         <>
           {applications.map((application) => {
