@@ -43,18 +43,19 @@ export default function Home({ jobs, user }) {
                   </button>
                 </Link>
 
-              <Link href={`/dashboard`}>
-              <button className='ml-5 border px-8 py-2 mt-t font-bold rounded-full bg-black text-white border-black'>
-                  see all the jobs you posted
-                </button>
-              </Link>
-                
+                <Link href={`/dashboard`}>
+                  <button className='ml-5 border px-8 py-2 mt-t font-bold rounded-full bg-black text-white border-black'>
+                    see all the jobs you posted
+                  </button>
+                </Link>
               </>
             ) : (
               <>
-                <button className='ml-5 border px-8 py-2 mt-t font-bold rounded-full bg-black text-white border-black'>
-                  see all the jobs you applied to
-                </button>
+                <Link href={`/dashboard`}>
+                  <button className='ml-5 border px-8 py-2 mt-t font-bold rounded-full bg-black text-white border-black'>
+                    see all the jobs you applied to
+                  </button>
+                </Link>
               </>
             )}
           </>
