@@ -1,11 +1,12 @@
 import Jobs from 'components/Jobs';
 import { getJobs, getUser } from 'lib/data';
-import prisma from 'lib/prisma';
+
 import { getSession, useSession } from 'next-auth/react';
 import Head from 'next/head';
-import Image from 'next/image';
+
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import prisma from 'lib/prisma';
 
 export default function Home({ jobs, user }) {
   const { data: session, status } = useSession();
