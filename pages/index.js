@@ -25,7 +25,9 @@ export default function Home({ user, jobs }) {
           <h2 className='mb-10 text-4xl font-bold'>Find a job!</h2>
         </div>
         {!session ? (
-          <a href='/api/auth/signin'>Login</a>
+          <a className='px-4 ml-8' href='/api/auth/signin'>
+            Login
+          </a>
         ) : (
           <a href='/api/auth/signout' className='px-4 ml-8'>
             Logout
@@ -33,7 +35,7 @@ export default function Home({ user, jobs }) {
         )}
         <Jobs jobs={jobs} />
         {session && (
-          <>
+          <div className='mb-10 ml-8 mt-20'>
             <p className='mb-10 text-2xl font-normal'>
               Welcome, {user.name}
               {user.company && (
@@ -45,7 +47,7 @@ export default function Home({ user, jobs }) {
             {user.company ? (
               <>
                 <Link href={`/new`}>
-                  <button className='border px-8 py-2 mt-5 font-bold rounded-full bg-black text-white border-black'>
+                  <button className='border px-8  py-2 mt-5 font-bold rounded-full bg-black text-white border-black'>
                     click here to post a new job
                   </button>
                 </Link>
@@ -65,7 +67,7 @@ export default function Home({ user, jobs }) {
                 </Link>
               </>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

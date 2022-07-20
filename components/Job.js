@@ -1,9 +1,10 @@
-import Link from 'next/link';
-import React from 'react';
-import { useRouter } from 'next/router';
+import Link from 'next/link'
+import React, { useState } from 'react'
+import { useRouter } from 'next/router'
 
 export default function Job({ job, isDashboard }) {
-  const router = useRouter();
+  const router = useRouter()
+
   return (
     <div className='mb-4 mt-20 pl-16 pr-16'>
       <Link href={`/job/${job.id}`}>
@@ -22,8 +23,8 @@ export default function Job({ job, isDashboard }) {
                 }),
                 headers: { 'Content-Type': 'application/json' },
                 method: 'PUT',
-              });
-              router.reload(window.location.pathname);
+              })
+              router.reload(window.location.pathname)
             }}
             className='bg-black text-white cursor-pointer uppercase text-sm p-2 mr-5'
           >
@@ -42,8 +43,8 @@ export default function Job({ job, isDashboard }) {
                   'Content-Type': 'application/json',
                 },
                 method: 'PUT',
-              });
-              router.reload(window.location.pathname);
+              })
+              router.reload(window.location.pathname)
             }}
             className='bg-black text-white uppercase text-sm p-2 mr-5 cursor-pointer'
           >
@@ -64,5 +65,5 @@ export default function Job({ job, isDashboard }) {
         </div>
       </div>
     </div>
-  );
+  )
 }

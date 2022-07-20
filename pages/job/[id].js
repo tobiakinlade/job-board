@@ -1,7 +1,7 @@
-import { alreadyApplied, getJob } from 'lib/data';
-import prisma from 'lib/prisma';
-import { getSession } from 'next-auth/react';
-import Link from 'next/link';
+import { alreadyApplied, getJob } from 'lib/data'
+import prisma from 'lib/prisma'
+import { getSession } from 'next-auth/react'
+import Link from 'next/link'
 
 export default function Job({ job, applied }) {
   return (
@@ -54,23 +54,24 @@ export default function Job({ job, applied }) {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 export async function getServerSideProps(context) {
-  const session = await getSession(context);
-  let job = await getJob(context.params.id, prisma);
-  job = JSON.parse(JSON.stringify(job));
+  const session = await getSession(context)
+  let job = await getJob(context.params.id, prisma)
+  job = JSON.parse(JSON.stringify(job))
 
   const applied = await alreadyApplied(
     session.user.id,
     context.params.id,
     prisma
-  );
+  )
+
   return {
     props: {
       job,
       applied,
     },
-  };
+  }
 }

@@ -1,13 +1,14 @@
-import { getApplications, getJobsPosted, getUser } from 'lib/data';
-import prisma from 'lib/prisma';
-import { getSession, useSession } from 'next-auth/react';
-import Link from 'next/link';
+import { getApplications, getJobsPosted, getUser } from 'lib/data'
+import prisma from 'lib/prisma'
+import { getSession, useSession } from 'next-auth/react'
+import Link from 'next/link'
 
-import Jobs from 'components/Jobs';
-import Job from 'components/Job';
+import Jobs from 'components/Jobs'
+import Job from 'components/Job'
 
 export default function Dashboard({ user, jobs, applications }) {
-  const { data: session, status } = useSession();
+  console.log(applications)
+  const { data: session, status } = useSession()
   return (
     <div className='mt-10'>
       <div className='text-center p-4 m-4'>
@@ -53,7 +54,7 @@ export default function Dashboard({ user, jobs, applications }) {
                         {application.author.email}
                       </h2>
                       <p className='text-lg font-normal mt-2 mb-3'>
-                        {application.coverLetter}
+                        {application.coverletter}
                       </p>
                       <hr />
                     </>
@@ -73,32 +74,32 @@ export default function Dashboard({ user, jobs, applications }) {
                     <a>{application.job.title}</a>
                   </Link>
                   <h2 className='text-base font-normal mt-3'>
-                    {application.coverLetter}
+                    {application.coverletter}
                   </h2>
                 </div>
               </div>
-            );
+            )
           })}
         </>
       )}
     </div>
-  );
+  )
 }
 
 export async function getServerSideProps(context) {
-  const session = await getSession(context);
-  let user = await getUser(session.user.id, prisma);
-  user = JSON.parse(JSON.stringify(user));
+  const session = await getSession(context)
+  let user = await getUser(session.user.id, prisma)
+  user = JSON.parse(JSON.stringify(user))
 
-  let jobs = [];
-  let applications = [];
+  let jobs = []
+  let applications = []
 
   if (user.company) {
-    jobs = await getJobsPosted(user.id, prisma);
-    jobs = JSON.parse(JSON.stringify(jobs));
+    jobs = await getJobsPosted(user.id, prisma)
+    jobs = JSON.parse(JSON.stringify(jobs))
   } else {
-    applications = await getApplications(user.id, prisma);
-    applications = JSON.parse(JSON.stringify(applications));
+    applications = await getApplications(user.id, prisma)
+    applications = JSON.parse(JSON.stringify(applications))
   }
 
   return {
@@ -107,5 +108,5 @@ export async function getServerSideProps(context) {
       user,
       applications,
     },
-  };
+  }
 }

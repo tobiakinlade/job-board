@@ -1,17 +1,19 @@
-import { useState } from 'react';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
-import { getJob } from 'lib/data';
-import prisma from 'lib/prisma';
-import { useSession } from 'next-auth/react';
+import { useState } from 'react'
+import { useRouter } from 'next/router'
+import Link from 'next/link'
+import { getJob, getUser } from 'lib/data'
+import prisma from 'lib/prisma'
+import { useSession, getSession } from 'next-auth/react'
 
-export default function Apply({ job }) {
-  const [coverLetter, setCoverLetter] = useState('');
-  const { data: session } = useSession();
-  const router = useRouter();
+export default function Apply({ job, user }) {
+  console.log(job.author.id)
+  console.log(user.id)
+  const [coverLetter, setCoverLetter] = useState('')
+  const { data: session } = useSession()
+  const router = useRouter()
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
     await fetch('/api/application', {
       body: JSON.stringify({
@@ -22,12 +24,12 @@ export default function Apply({ job }) {
         'Content-Type': 'application/json',
       },
       method: 'POST',
-    });
+    })
 
-    router.push('/dashboard');
-  };
+    router.push('/dashboard')
+  }
 
-  if (!session) return null;
+  if (!session) return null
   return (
     <form onSubmit={handleSubmit}>
       <div className='flex flex-col w-1/2 mx-auto'>
@@ -65,33 +67,46 @@ export default function Apply({ job }) {
             </div>
           </div>
 
-          <div className='pt-2 mt-2 mr-1'>
-            <textarea
-              className='border p-4 w-full text-lg font-medium bg-transparent outline-none color-primary'
-              required
-              placeholder='Cover letter'
-              cols={50}
-              rows={6}
-              onChange={(e) => setCoverLetter(e.target.value)}
-            />
-          </div>
-          <div className='mt-5'>
-            <button className='border float-right px-8 py-2 mt-0 font-bold rounded-full'>
-              Apply to this job
-            </button>
-          </div>
+          {user.id === job.author.id ? (
+            <p className='mt-10 ml-8'>This job was posted by you</p>
+          ) : (
+            <>
+              <div className='pt-2 mt-2 mr-1'>
+                <textarea
+                  className='border p-4 w-full text-lg font-medium bg-transparent outline-none color-primary'
+                  required
+                  placeholder='Cover letter'
+                  cols={50}
+                  rows={6}
+                  onChange={(e) => setCoverLetter(e.target.value)}
+                />
+              </div>
+              <div className='mt-5'>
+                <button className='border float-right px-8 py-2 mt-0 font-bold rounded-full'>
+                  Apply to this job
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </form>
-  );
+  )
 }
 
 export async function getServerSideProps(context) {
-  let job = await getJob(context.params.id, prisma);
-  job = JSON.parse(JSON.stringify(job));
+  const session = await getSession(context)
+
+  let job = await getJob(context.params.id, prisma)
+  job = JSON.parse(JSON.stringify(job))
+
+  let user = await getUser(session.user.id, prisma)
+  user = JSON.parse(JSON.stringify(user))
+
   return {
     props: {
       job,
+      user,
     },
-  };
+  }
 }
