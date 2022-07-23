@@ -7,8 +7,8 @@ import Jobs from 'components/Jobs'
 import Job from 'components/Job'
 
 export default function Dashboard({ user, jobs, applications }) {
-  console.log(applications)
   const { data: session, status } = useSession()
+
   return (
     <div className='mt-10'>
       <div className='text-center p-4 m-4'>
@@ -54,8 +54,9 @@ export default function Dashboard({ user, jobs, applications }) {
                         {application.author.email}
                       </h2>
                       <p className='text-lg font-normal mt-2 mb-3'>
-                        {application.coverletter}
+                        {application.coverletter}{' '}
                       </p>
+
                       <hr />
                     </>
                   ))}

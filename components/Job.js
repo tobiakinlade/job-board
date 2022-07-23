@@ -7,9 +7,11 @@ export default function Job({ job, isDashboard }) {
 
   return (
     <div className='mb-4 mt-20 pl-16 pr-16'>
-      <Link href={`/job/${job.id}`}>
-        <a className='text-xl font-bold underline'>{job.title}</a>
-      </Link>
+      <div className=''>
+        <Link href={`/job/${job.id}`}>
+          <a className='text-xl font-bold underline'>{job.title}</a>
+        </Link>
+      </div>
 
       <h2 className='text-base font-normal mt-3'>{job.description}</h2>
       <div className='mt-4'>
