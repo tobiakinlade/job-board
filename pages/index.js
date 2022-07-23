@@ -25,13 +25,13 @@ export default function Home({ user, jobs }) {
           <h2 className='mb-10 text-4xl font-bold'>Find a job!</h2>
         </div>
         {!session ? (
-          <a className='px-4 ml-8' href='/api/auth/signin'>
-            Login
-          </a>
+          <Link href='/api/auth/signin'>
+            <a className='px-4 ml-8'>Login</a>
+          </Link>
         ) : (
-          <a href='/api/auth/signout' className='px-4 ml-8'>
-            Logout
-          </a>
+          <Link href='/api/auth/signout'>
+            <a className='px-4 ml-8'>Logout</a>
+          </Link>
         )}
         <Jobs jobs={jobs} />
         {session && (
