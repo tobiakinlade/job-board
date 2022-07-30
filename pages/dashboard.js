@@ -11,6 +11,11 @@ export default function Dashboard({ user, jobs, applications }) {
 
   return (
     <div className='mt-10'>
+      <div className='ml-8'>
+        <Link href='/'>
+          <a>Home</a>
+        </Link>
+      </div>
       <div className='text-center p-4 m-4'>
         <h2 className='mb-20 text-4xl font-bold'>Dashboard</h2>
         {user.company && (
