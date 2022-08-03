@@ -1,9 +1,15 @@
 import { alreadyApplied, getJob } from 'lib/data'
 import prisma from 'lib/prisma'
-import { getSession } from 'next-auth/react'
+import { getSession, useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 
 export default function Job({ job, applied }) {
+  const { data: session, status } = useSession()
+
+  const loading = status === 'loading'
+  const router = useRouter()
+
   return (
     <div className='flex flex-col w-1/2 mx-auto'>
       <div className='text-center p-4 m-4'>
@@ -29,11 +35,19 @@ export default function Job({ job, applied }) {
             </div>
           ) : (
             <div className='mt-20 flex justify-center'>
-              <Link href={`/job/${job.id}/apply`}>
-                <button className='border px-8 py-2 mt-0 font-bold rounded-full bg-black text-white'>
-                  Apply for this job
-                </button>
-              </Link>
+              {session ? (
+                <Link href={`/job/${job.id}/apply`}>
+                  <button className='border px-8 py-2 mt-0 font-bold rounded-full bg-black text-white'>
+                    Apply for this job
+                  </button>
+                </Link>
+              ) : (
+                <Link href='/api/auth/signin'>
+                  <button className='border px-8 py-2 mt-0 font-bold rounded-full bg-black text-white'>
+                    Sign in to apply
+                  </button>
+                </Link>
+              )}
             </div>
           )}
 
@@ -63,7 +77,7 @@ export async function getServerSideProps(context) {
   job = JSON.parse(JSON.stringify(job))
 
   const applied = await alreadyApplied(
-    session.user.id,
+    session?.user.id,
     context.params.id,
     prisma
   )

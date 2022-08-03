@@ -100,7 +100,7 @@ export async function getServerSideProps(context) {
   let job = await getJob(context.params.id, prisma)
   job = JSON.parse(JSON.stringify(job))
 
-  let user = await getUser(session.user.id, prisma)
+  let user = await getUser(session?.user.id, prisma)
   user = JSON.parse(JSON.stringify(user))
 
   return {
