@@ -68,14 +68,3 @@ job-board/
 
 ---
 
----
-
-## ⚙️ Setup Instructions
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/your-username/job-board-k8s.git
-cd job-board-k8s
-
-
