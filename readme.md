@@ -1,4 +1,4 @@
-# 🧑‍💼 Job Board Application (Kubernetes Edition)
+# 🧑‍💼 Job Board Application 
 
 A **full-stack Job Board application** deployed on **Kubernetes**, featuring a **React** frontend, **Node.js/Express** backend, and **PostgreSQL** database.  
 This project demonstrates **container orchestration**, **service networking**, **persistent storage**, and **environment management** using Kubernetes.
