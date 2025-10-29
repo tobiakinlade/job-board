@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: job-board
+  labels:
+    name: job-board
+    environment: production
