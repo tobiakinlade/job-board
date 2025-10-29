@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: job-board-ingress
+  namespace: job-board
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+
+spec:
+  ingressClassName: nginx 
+  rules: 
+  - host: job-board.local
+    http: 
+      paths:
+      - path: /
+        pathType: Prefix 
+        backend: 
+          service: 
+            name: frontend-service
+            port:
+              number: 3000
+      - path: /api 
+        pathType: Prefix
+        backend: 
+          service: 
+            name: backend-service 
+            port: 
+              number: 3001
+      
