@@ -1,15 +1,14 @@
-apiVersion: v1 
-kind: Service 
-metadata: 
+apiVersion: v1
+kind: Service
+metadata:
   name: frontend-service
   namespace: job-board
-spec: 
-  type: NodePort
+spec:
+  type: ClusterIP
   selector:
     app: frontend
   ports:
   - port: 3000
     targetPort: 3000
-    nodePort: 30000
     protocol: TCP
     name: http

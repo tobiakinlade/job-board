@@ -1,33 +1,14 @@
----
-# Backend Service for ALB
 apiVersion: v1
 kind: Service
 metadata:
   name: backend-service
   namespace: job-board
 spec:
-  type: ClusterIP  # Use ClusterIP for ALB integration
+  type: ClusterIP
   selector:
     app: backend
   ports:
   - port: 3001
     targetPort: 3001
-    protocol: TCP
-    name: http
-
----
-# Frontend Service for ALB
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend-service
-  namespace: job-board
-spec:
-  type: ClusterIP  # Use ClusterIP for ALB integration
-  selector:
-    app: frontend
-  ports:
-  - port: 3000
-    targetPort: 3000
     protocol: TCP
     name: http

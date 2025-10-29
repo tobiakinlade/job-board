@@ -62,3 +62,14 @@ output "configure_kubectl" {
   description = "Configure kubectl: run the following command to update your kubeconfig"
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}"
 }
+
+
+output "application_url" {
+  description = "Application URL - Access your application via this URL"
+  value       = "Application will be accessible via Kubernetes ingress. Run: kubectl get ingress -n default"
+}
+
+output "get_ingress_url" {
+  description = "Command to get the ingress URL"
+  value       = "kubectl get ingress job-board-ingress -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
+}

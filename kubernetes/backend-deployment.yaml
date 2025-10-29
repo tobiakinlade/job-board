@@ -15,9 +15,7 @@ spec:
     spec:
       containers:
       - name: backend
-        # Update this with your ECR repository URL
-        # Format: AWS_ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/job-board-eks/backend:latest
-        image: REPLACE_WITH_ECR_BACKEND_URL:latest
+        image: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-eks/backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3001
@@ -49,26 +47,7 @@ spec:
               name: job-board-secrets
               key: DB_PASSWORD
         - name: PORT
-          valueFrom:
-            configMapKeyRef:
-              name: job-board-config
-              key: BACKEND_PORT
-        livenessProbe:
-          httpGet:
-            path: /api/jobs
-            port: 3001
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /api/jobs
-            port: 3001
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
+          value: "3001"
         resources:
           requests:
             memory: "128Mi"
@@ -76,16 +55,3 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-      # Add node affinity to prefer scheduling on nodes in different AZs
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - backend
-              topologyKey: topology.kubernetes.io/zone

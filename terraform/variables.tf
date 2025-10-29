@@ -57,3 +57,9 @@ variable "node_instance_types" {
   type        = list(string)
   default     = ["t3.medium"]
 }
+
+variable "domain_name" {
+  description = "Domain name for the application (e.g., tech-with-tobi.com). Leave empty to skip HTTPS setup."
+  type        = string
+  default     = ""
+}
