@@ -1,6 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: 
+metadata:
   name: frontend
   namespace: job-board
 spec:
@@ -15,14 +15,16 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: job-board-frontend:latest
-        imagePullPolicy: IfNotPresent
+        # Update this with your ECR repository URL
+        # Format: AWS_ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/job-board-eks/frontend:latest
+        image: REPLACE_WITH_ECR_FRONTEND_URL:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 3000
           name: http
         env:
         - name: REACT_APP_API_URL
-          valueFrom: 
+          valueFrom:
             configMapKeyRef:
               name: job-board-config
               key: REACT_APP_API_URL
@@ -33,6 +35,7 @@ spec:
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /
@@ -40,10 +43,24 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 5
           timeoutSeconds: 3
+          failureThreshold: 3
         resources:
           requests:
             memory: "128Mi"
             cpu: "100m"
           limits:
-            memory: "256Mi"
-            cpu: "200m"
+            memory: "512Mi"
+            cpu: "500m"
+      # Add node affinity to prefer scheduling on nodes in different AZs
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - frontend
+              topologyKey: topology.kubernetes.io/zone

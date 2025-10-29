@@ -1,0 +1,260 @@
+# ===================================
+# Job Board Application - .gitignore
+# ===================================
+
+# ===================================
+# Terraform
+# ===================================
+# Local .terraform directories
+**/.terraform/*
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform lock file (commit this in production, but exclude for local dev flexibility)
+.terraform.lock.hcl
+
+# Terraform variable files that might contain sensitive data
+terraform.tfvars
+*.auto.tfvars
+
+# Terraform override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI configuration files
+.terraformrc
+terraform.rc
+
+# Crash log files
+crash.log
+crash.*.log
+
+# ===================================
+# Node.js & NPM
+# ===================================
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+
+# Production builds
+build/
+dist/
+
+# Misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ===================================
+# Environment Variables & Secrets
+# ===================================
+.env
+.env.*
+!.env.example
+*.env
+.env.eks
+*.pem
+*.key
+*.crt
+secrets/
+secrets.yaml
+
+# AWS credentials
+.aws/
+credentials
+config
+
+# ===================================
+# Docker
+# ===================================
+# Docker volumes
+docker-compose.override.yml
+.dockerignore
+
+# ===================================
+# Kubernetes
+# ===================================
+# Kubeconfig files
+kubeconfig
+*.kubeconfig
+.kube/
+
+# Kubernetes secrets (never commit these!)
+*secret*.yaml
+*secrets*.yaml
+
+# Backup files from kubectl
+*.yaml.bak
+*.yml.bak
+
+# ===================================
+# IDE & Editors
+# ===================================
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# ===================================
+# Operating System
+# ===================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ===================================
+# Logs
+# ===================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===================================
+# Backups
+# ===================================
+*.bak
+*.backup
+*.tmp
+*.temp
+*~
+
+# ===================================
+# Database
+# ===================================
+*.sql
+!init.sql
+!backend/init.sql
+*.db
+*.sqlite
+*.sqlite3
+
+# PostgreSQL
+postgres-data/
+pgdata/
+
+# ===================================
+# Application Specific
+# ===================================
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# SSL certificates (if not using cert-manager)
+*.pem
+*.crt
+*.key
+ssl/
+
+# Terraform plan output
+tfplan
+plan.out
+
+# Scripts backup
+*.sh.bak
+
+# Image builds
+.image-tag
+
+# Helm charts (if using)
+charts/*.tgz
+
+# ===================================
+# CI/CD
+# ===================================
+.github/workflows/*.local.yml
+
+# ===================================
+# Keep These Files
+# ===================================
+# Keep example/template files
+!*.example
+!.env.example
+!terraform.tfvars.example
+!secrets.example.yaml
+
+# Keep documentation
+!README.md
+!*.md
+
+# Keep configuration templates
+!*.template
+!*.tpl
