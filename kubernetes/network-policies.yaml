@@ -1,10 +1,24 @@
 ---
-# Network Policy for PostgreSQL
-# Only allows backend pods to connect to database
+# 1. DEFAULT DENY ALL INGRESS for PostgreSQL
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-network-policy
+  name: postgres-deny-all
+  namespace: job-board
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+  - Ingress
+  ingress: []  # No rules = deny all incoming traffic
+
+---
+# 2. ALLOW BACKEND to POSTGRES
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-backend
   namespace: job-board
 spec:
   podSelector:
@@ -22,11 +36,11 @@ spec:
       port: 5432
 
 ---
-# Network Policy for Backend
+# 3. BACKEND POLICY
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: backend-network-policy
+  name: backend-allow-frontend
   namespace: job-board
 spec:
   podSelector:
@@ -43,10 +57,6 @@ spec:
     ports:
     - protocol: TCP
       port: 3001
-  - from: []
-    ports:
-    - protocol: TCP
-      port: 3001
   egress:
   - to:
     - podSelector:
@@ -56,7 +66,9 @@ spec:
     - protocol: TCP
       port: 5432
   - to:
-    - namespaceSelector: {}
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
       podSelector:
         matchLabels:
           k8s-app: kube-dns
@@ -65,11 +77,11 @@ spec:
       port: 53
 
 ---
-# Network Policy for Frontend
+# 4. FRONTEND POLICY
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: frontend-network-policy
+  name: frontend-allow-external
   namespace: job-board
 spec:
   podSelector:
@@ -79,8 +91,7 @@ spec:
   - Ingress
   - Egress
   ingress:
-  - from: []
-    ports:
+  - ports:
     - protocol: TCP
       port: 3000
   egress:
@@ -92,7 +103,9 @@ spec:
     - protocol: TCP
       port: 3001
   - to:
-    - namespaceSelector: {}
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
       podSelector:
         matchLabels:
           k8s-app: kube-dns

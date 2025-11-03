@@ -1,6 +1,5 @@
-# ingress-provisioner.tf
-
-# Generate ingress manifest - this is safe and doesn't depend on cluster readiness
+# Generate ingress manifest template (optional, but kept as you had it)
+# This file is typically used for local testing or CI/CD pipelines.
 resource "local_file" "ingress_manifest" {
   content = templatefile("${path.module}/../kubernetes/ingress.yaml.tpl", {
     ssl_enabled     = false
@@ -24,7 +23,7 @@ resource "kubernetes_namespace" "job_board" {
   depends_on = [helm_release.aws_load_balancer_controller]
 }
 
-# Create the ingress resource using Terraform (recommended approach)
+# Create the ingress resource for routing traffic to frontend and backend services
 resource "kubernetes_ingress_v1" "job_board" {
   metadata {
     name      = "job-board-ingress"
@@ -49,6 +48,7 @@ resource "kubernetes_ingress_v1" "job_board" {
   spec {
     ingress_class_name = "alb"
 
+    # Route /api/* to the backend service
     rule {
       http {
         path {
@@ -64,6 +64,7 @@ resource "kubernetes_ingress_v1" "job_board" {
           }
         }
 
+        # Route / (everything else) to the frontend service
         path {
           path      = "/"
           path_type = "Prefix"
@@ -83,35 +84,5 @@ resource "kubernetes_ingress_v1" "job_board" {
   depends_on = [
     helm_release.aws_load_balancer_controller,
     kubernetes_namespace.job_board
-  ]
-}
-
-output "infrastructure_ready" {
-  value = <<-EOT
-    ✅ Infrastructure provisioned successfully!
-    
-    Cluster: ${module.eks.cluster_name}
-    Endpoint: ${module.eks.cluster_endpoint}
-    
-    ECR Repositories:
-    - Backend: ${aws_ecr_repository.backend.repository_url}
-    - Frontend: ${aws_ecr_repository.frontend.repository_url}
-    
-    Next steps:
-    1. Build and push your Docker images to ECR
-    2. Deploy your application services using kubectl
-    3. The ALB ingress is already configured and ready
-    
-    To get the ALB DNS name after deployment:
-    kubectl get ingress -n job-board
-    
-    To verify everything is working:
-    kubectl get pods -n job-board
-    kubectl get services -n job-board
-  EOT
-
-  depends_on = [
-    kubernetes_ingress_v1.job_board,
-    helm_release.aws_load_balancer_controller
   ]
 }

@@ -31,7 +31,7 @@ function App() {
 
   const fetchJobs = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/jobs`);
+      const response = await fetch(`${API_URL}/jobs`);
       const data = await response.json();
       setJobs(data);
       setLoading(false);
@@ -44,7 +44,7 @@ function App() {
   const handleJobSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_URL}/api/jobs`, {
+      const response = await fetch(`${API_URL}/jobs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,7 +71,7 @@ function App() {
   const handleApplicationSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_URL}/api/applications`, {
+      const response = await fetch(`${API_URL}/applications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

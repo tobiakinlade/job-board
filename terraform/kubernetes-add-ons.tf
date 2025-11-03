@@ -1,29 +1,4 @@
-# Configure Kubernetes provider
-provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
-  }
-}
-
-provider "helm" {
-  kubernetes {
-    host                   = module.eks.cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-
-    exec {
-      api_version = "client.authentication.k8s.io/v1beta1"
-      command     = "aws"
-      args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
-    }
-  }
-}
-
-# EBS CSI Driver
+# EBS CSI Driver Helm Chart
 resource "helm_release" "ebs_csi_driver" {
   name       = "aws-ebs-csi-driver"
   repository = "https://kubernetes-sigs.github.io/aws-ebs-csi-driver"
@@ -31,15 +6,16 @@ resource "helm_release" "ebs_csi_driver" {
   namespace  = "kube-system"
   version    = "2.25.0"
 
+  # Pass the IRSA role ARN to the controller service account
   set {
     name  = "controller.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = module.ebs_csi_irsa_role.iam_role_arn
   }
 
-  depends_on = [module.eks]
+  depends_on = [module.eks, module.ebs_csi_irsa_role] # Added explicit dependency on IAM role
 }
 
-# AWS Load Balancer Controller
+# AWS Load Balancer Controller Helm Chart
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
@@ -52,6 +28,7 @@ resource "helm_release" "aws_load_balancer_controller" {
     value = module.eks.cluster_name
   }
 
+  # Pass the IRSA role ARN to the service account
   set {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = module.lb_controller_irsa_role.iam_role_arn
@@ -67,10 +44,10 @@ resource "helm_release" "aws_load_balancer_controller" {
     value = module.vpc.vpc_id
   }
 
-  depends_on = [module.eks]
+  depends_on = [module.eks, module.lb_controller_irsa_role] # Added explicit dependency on IAM role
 }
 
-# Storage Class for EBS
+# Storage Class for EBS using gp3
 resource "kubernetes_storage_class_v1" "ebs_gp3" {
   metadata {
     name = "ebs-gp3"
