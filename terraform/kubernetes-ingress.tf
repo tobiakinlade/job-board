@@ -6,6 +6,7 @@ resource "local_file" "ingress_manifest" {
     certificate_arn = ""
     domain_name     = ""
     namespace       = "job-board"
+    alb_sg_id       = aws_security_group.alb.id
   })
   filename        = "${path.module}/../kubernetes/ingress-generated.yaml"
   file_permission = "0644"
@@ -23,6 +24,7 @@ resource "kubernetes_namespace" "job_board" {
   depends_on = [helm_release.aws_load_balancer_controller]
 }
 
+
 # Create the ingress resource for routing traffic to frontend and backend services
 resource "kubernetes_ingress_v1" "job_board" {
   metadata {
@@ -32,6 +34,7 @@ resource "kubernetes_ingress_v1" "job_board" {
       "alb.ingress.kubernetes.io/scheme"                    = "internet-facing"
       "alb.ingress.kubernetes.io/target-type"               = "ip"
       "alb.ingress.kubernetes.io/load-balancer-name"        = "job-board-alb"
+      "alb.ingress.kubernetes.io/security-groups"           = aws_security_group.alb.id
       "alb.ingress.kubernetes.io/healthcheck-protocol"      = "HTTP"
       "alb.ingress.kubernetes.io/healthcheck-port"          = "traffic-port"
       "alb.ingress.kubernetes.io/healthcheck-path"          = "/"
@@ -83,6 +86,7 @@ resource "kubernetes_ingress_v1" "job_board" {
 
   depends_on = [
     helm_release.aws_load_balancer_controller,
-    kubernetes_namespace.job_board
+    kubernetes_namespace.job_board,
+    aws_security_group.alb
   ]
 }
