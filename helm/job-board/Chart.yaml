@@ -1,0 +1,26 @@
+apiVersion: v2 
+name: job-board
+description: A Helm chart for the Job Board full-stack application on Kubernetes
+type: application
+version: 0.1.0 # Chart version (incremented on chart changes)
+appVersion: "1.0.0" # Application version (from Docker images)
+
+keywords:
+  - job-board
+  - fullstack
+  - react
+  - nodejs
+  - postgresql
+
+
+maintainers:
+  - name: Tobi Akinlade
+    email: tobi.akinlade@yahoo.com
+
+
+dependencies: []
+
+# Annotations for metadata
+annotations:
+  category: Application
+  license: Apache-2.0

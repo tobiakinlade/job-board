@@ -1,0 +1,327 @@
+# Default values for job-board Helm chart
+
+# Global settings
+global: 
+  namespace: job-board
+  imagePullPolicy: IfNotPresent
+  storageClass: gp3
+
+
+# Backend configuration
+backend:
+  enabled: true
+  name: backend
+  replicaCount: 2
+
+  image: 
+    repository: "" # Will be set by CI: <AWS_ACCOUNT>.dkr.ecr.<REGION>.amazonaws.com/job-board-eks/backend
+    tag: ""  # Will be set by CI: latest or specific version
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3001
+    targetPort: 3001
+    annotations: {}
+
+  resources:
+    requests: 
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3001
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 3001
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  env:
+    - name: NODE_ENV
+      value: "production"
+    - name: PORT
+      value: "3001"
+    - name: DB_HOST
+      valueFrom:
+        configMapKeyRef:
+          name: job-board-config
+          key: DB_HOST
+    - name: DB_PORT
+      valueFrom:
+        configMapKeyRef:
+          name: job-board-config
+          key: DB_PORT
+    - name: DB_NAME
+      valueFrom:
+        configMapKeyRef:
+          name: job-board-config
+          key: DB_NAME
+    - name: DB_USER
+      valueFrom:
+        secretKeyRef:
+          name: job-board-secrets
+          key: DB_USER
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: job-board-secrets
+          key: DB_PASSWORD
+
+# Frontend configuration
+frontend:
+  enabled: true
+  name: frontend
+  replicaCount: 2
+  
+  image:
+    repository: ""  # Will be set by CI
+    tag: ""  # Will be set by CI
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+    annotations: {}
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+  
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  
+  env:
+    - name: REACT_APP_API_URL
+      value: "/api"
+
+# PostgreSQL configuration
+postgres:
+  enabled: true
+  name: postgres
+  
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 5432
+    targetPort: 5432
+    clusterIP: None  # Headless service for StatefulSet
+  
+  persistence:
+    enabled: true
+    storageClass: gp3
+    accessMode: ReadWriteOnce
+    size: 10Gi
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  
+  livenessProbe:
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  
+  env:
+    - name: POSTGRES_DB
+      valueFrom:
+        configMapKeyRef:
+          name: job-board-config
+          key: DB_NAME
+    - name: POSTGRES_USER
+      valueFrom:
+        secretKeyRef:
+          name: job-board-secrets
+          key: DB_USER
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: job-board-secrets
+          key: DB_PASSWORD
+    - name: PGDATA
+      value: /var/lib/postgresql/data/pgdata
+  
+  initScript: |
+    CREATE TABLE IF NOT EXISTS jobs (
+      id SERIAL PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      company VARCHAR(255) NOT NULL,
+      location VARCHAR(255),
+      description TEXT,
+      salary_range VARCHAR(100),
+      job_type VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+# ConfigMap data
+configMap:
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "jobboard"
+
+# Secrets (base64 encoded - will be injected by CI/CD or sealed-secrets)
+secrets:
+  DB_USER: "am9iYm9hcmQ="  # jobboard
+  DB_PASSWORD: "cGFzc3dvcmQ="  # password - CHANGE IN PRODUCTION
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/tags: "Environment=dev,Project=job-board"
+  
+  rules:
+    - http:
+        paths:
+          - path: /api/*
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 3001
+          - path: /*
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service  # Backend serves frontend static files
+                port:
+                  number: 3001
+
+# Network Policies
+networkPolicies:
+  enabled: true
+  
+  # Backend network policy
+  backend:
+    policyTypes:
+      - Ingress
+    ingress:
+      # Allow from frontend
+      - from:
+          - podSelector:
+              matchLabels:
+                app: frontend
+        ports:
+          - protocol: TCP
+            port: 3001
+      # Allow from ALB
+      - from:
+          - namespaceSelector: {}
+        ports:
+          - protocol: TCP
+            port: 3001
+  
+  # PostgreSQL network policy
+  postgres:
+    policyTypes:
+      - Ingress
+    ingress:
+      # Only allow from backend
+      - from:
+          - podSelector:
+              matchLabels:
+                app: backend
+        ports:
+          - protocol: TCP
+            port: 5432
+  
+  # Frontend network policy (if needed)
+  frontend:
+    policyTypes:
+      - Ingress
+    ingress:
+      # Allow from ALB
+      - from:
+          - namespaceSelector: {}
+        ports:
+          - protocol: TCP
+            port: 3000
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: false
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "job-board-sa"
+
+# Labels applied to all resources
+labels:
+  app.kubernetes.io/name: job-board
+  app.kubernetes.io/instance: job-board
+  app.kubernetes.io/version: "1.0.0"
+  app.kubernetes.io/managed-by: Helm
+
+# Annotations applied to all resources
+annotations: {}
