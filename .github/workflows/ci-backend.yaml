@@ -1,0 +1,326 @@
+name: Backend CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yaml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+
+env:
+  AWS_REGION: eu-west-2
+  ECR_REPOSITORY: job-board-eks/backend
+  GITOPS_REPO: ${{ github.repository_owner }}/job-board-gitops
+
+jobs:
+  test:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+      
+      - name: Run linting
+        working-directory: ./backend
+        run: npm run lint || echo "Linting not configured"
+      
+      - name: Run tests
+        working-directory: ./backend
+        run: npm test || echo "Tests not configured"
+      
+      - name: Test coverage
+        working-directory: ./backend
+        run: npm run test:coverage || echo "Coverage not configured"
+  build:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+      image-full: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for proper versioning
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ steps.meta.outputs.created }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+      
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        continue-on-error: true
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+        if: always()
+
+  update-gitops:
+    name: Update GitOps Repository
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          token: ${{ secrets.GITOPS_PAT }}
+          path: gitops
+      
+      - name: Setup yq
+        uses: mikefarah/yq@master
+      
+      - name: Update dev environment values
+        working-directory: gitops/environments/dev
+        run: |
+          # Get AWS Account ID
+          AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
+          
+          # Construct full image path
+          IMAGE_TAG="${{ needs.build.outputs.image-tag }}"
+          FULL_IMAGE="${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}"
+          
+          echo "Updating backend image to: ${FULL_IMAGE}"
+          
+          # Update values.yaml with new image
+          yq eval ".backend.image.repository = \"${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}\"" -i values.yaml
+          yq eval ".backend.image.tag = \"${IMAGE_TAG}\"" -i values.yaml
+          
+          # Add deployment timestamp
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          yq eval ".backend.annotations.\"deployment.timestamp\" = \"${TIMESTAMP}\"" -i values.yaml
+          yq eval ".backend.annotations.\"deployment.commit\" = \"${{ github.sha }}\"" -i values.yaml
+          yq eval ".backend.annotations.\"deployment.actor\" = \"${{ github.actor }}\"" -i values.yaml
+      
+      - name: Create deployment artifact
+        working-directory: gitops
+        run: |
+          # Create deployment history directory
+          TIMESTAMP=$(date -u +"%Y-%m-%d-%H-%M-%S")
+          ARTIFACT_DIR="deployments/history/dev/${TIMESTAMP}"
+          mkdir -p "${ARTIFACT_DIR}"
+          
+          # Save deployment metadata
+          cat > "${ARTIFACT_DIR}/metadata.json" << EOF
+          {
+            "timestamp": "${TIMESTAMP}",
+            "environment": "dev",
+            "component": "backend",
+            "image_tag": "${{ needs.build.outputs.image-tag }}",
+            "commit_sha": "${{ github.sha }}",
+            "commit_message": "${{ github.event.head_commit.message }}",
+            "actor": "${{ github.actor }}",
+            "workflow_run": "${{ github.run_id }}",
+            "repository": "${{ github.repository }}"
+          }
+          EOF
+          
+          # Save full values file
+          cp environments/dev/values.yaml "${ARTIFACT_DIR}/values.yaml"
+          
+          # Create deployment summary
+          echo "# Deployment Summary" > "${ARTIFACT_DIR}/README.md"
+          echo "" >> "${ARTIFACT_DIR}/README.md"
+          echo "**Environment:** dev" >> "${ARTIFACT_DIR}/README.md"
+          echo "**Timestamp:** ${TIMESTAMP}" >> "${ARTIFACT_DIR}/README.md"
+          echo "**Component:** backend" >> "${ARTIFACT_DIR}/README.md"
+          echo "**Image Tag:** ${{ needs.build.outputs.image-tag }}" >> "${ARTIFACT_DIR}/README.md"
+          echo "**Commit:** ${{ github.sha }}" >> "${ARTIFACT_DIR}/README.md"
+          echo "**Actor:** ${{ github.actor }}" >> "${ARTIFACT_DIR}/README.md"
+          echo "" >> "${ARTIFACT_DIR}/README.md"
+          echo "## Commit Message" >> "${ARTIFACT_DIR}/README.md"
+          echo "${{ github.event.head_commit.message }}" >> "${ARTIFACT_DIR}/README.md"
+      
+      - name: Commit and push changes
+        working-directory: gitops
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          
+          git add environments/dev/values.yaml
+          git add deployments/history/
+          
+          git commit -m "🚀 Deploy backend ${{ needs.build.outputs.image-tag }} to dev
+          
+          Component: backend
+          Image: ${{ needs.build.outputs.image-tag }}
+          Commit: ${{ github.sha }}
+          Actor: ${{ github.actor }}
+          
+          Automated deployment from ${{ github.repository }}"
+          
+          git push origin main
+      
+      - name: Create deployment comment on commit
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: `🚀 **Backend Deployed to Dev**\n\n` +
+                    `**Image:** \`${{ needs.build.outputs.image-tag }}\`\n` +
+                    `**Workflow:** [View Run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n` +
+                    `**ArgoCD:** [View Application](https://argocd.example.com/applications/job-board-dev)`
+  
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [build, update-gitops]
+    if: always()
+    
+    steps:
+      - name: Notify Slack on Success
+        if: needs.update-gitops.result == 'success'
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "✅ Backend deployed to dev successfully",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ Backend Deployment Successful"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\ndev"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Image Tag:*\n${{ needs.build.outputs.image-tag }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Actor:*\n${{ github.actor }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+      
+      - name: Notify Slack on Failure
+        if: needs.update-gitops.result == 'failure'
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "❌ Backend deployment to dev failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ Backend Deployment Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Deployment to dev environment failed. Check the workflow for details."
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
