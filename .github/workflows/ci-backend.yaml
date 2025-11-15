@@ -1,13 +1,13 @@
 name: Backend CI Pipeline
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-    paths:
-      - 'backend/**'
-      - '.github/workflows/ci-backend.yaml'
+  # push:
+  #   branches:
+  #     - main
+  #     - develop
+  #   paths:
+  #     - 'backend/**'
+  #     - '.github/workflows/ci-backend.yaml'
   pull_request:
     branches:
       - main
@@ -138,7 +138,7 @@ jobs:
           path: gitops
       
       - name: Setup yq
-        uses: mikefarah/yq@master
+        uses: mikefarah/yq@v4
       
       - name: Update dev environment values
         working-directory: gitops/environments/dev

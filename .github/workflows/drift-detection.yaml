@@ -1,0 +1,170 @@
+name: Drift Detection
+
+on:
+  # schedule:
+  #   - cron: '*/15 * * * *'
+  workflow_dispatch: #Allow manual trigger
+    inputs:
+      environment:
+        description: 'Environment to check for drift'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: eu-west-2
+  CLUSTER_NAME: job-board-eks
+        
+jobs:
+  detect-drift:
+    name: Detect Configuration Drift
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.environment)) || fromJSON('["dev", "staging", "prod"]') }}
+    
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.0'
+      
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.13.0'
+      
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+      
+      - name: Get current cluster state
+        id: cluster-state
+        run: |
+          NAMESPACE="job-board"
+          
+          # Get deployments
+          echo "=== Deployments ==="
+          kubectl get deployments -n ${NAMESPACE} -o yaml > /tmp/cluster-deployments.yaml
+          
+          # Get statefulsets
+          echo "=== StatefulSets ==="
+          kubectl get statefulsets -n ${NAMESPACE} -o yaml > /tmp/cluster-statefulsets.yaml
+          
+          # Get services
+          echo "=== Services ==="
+          kubectl get services -n ${NAMESPACE} -o yaml > /tmp/cluster-services.yaml
+          
+          # Get configmaps (excluding system ones)
+          echo "=== ConfigMaps ==="
+          kubectl get configmaps -n ${NAMESPACE} -o yaml | \
+            grep -v "kube-root-ca.crt" > /tmp/cluster-configmaps.yaml || true
+          
+          # Get ingress
+          echo "=== Ingress ==="
+          kubectl get ingress -n ${NAMESPACE} -o yaml > /tmp/cluster-ingress.yaml
+          
+          # Get network policies
+          echo "=== Network Policies ==="
+          kubectl get networkpolicies -n ${NAMESPACE} -o yaml > /tmp/cluster-networkpolicies.yaml
+      
+      - name: Render expected state from Helm
+        id: helm-render
+        run: |
+          ENVIRONMENT="${{ matrix.environment }}"
+          VALUES_FILE="environments/${ENVIRONMENT}/values.yaml"
+          
+          echo "Rendering Helm template for ${ENVIRONMENT}"
+          
+          # Render Helm template with environment values
+          helm template job-board ./helm/job-board \
+            -f ./helm/job-board/values.yaml \
+            -f "./${VALUES_FILE}" \
+            --namespace job-board \
+            --output-dir /tmp/helm-output
+          
+          echo "Helm templates rendered to /tmp/helm-output"
+
+      - name: Compare cluster state with GitOps repo
+        id: compare
+        run: |
+          DRIFT_DETECTED=false
+          DRIFT_REPORT="/tmp/drift-report.md"
+          
+          echo "# Drift Detection Report" > ${DRIFT_REPORT}
+          echo "" >> ${DRIFT_REPORT}
+          echo "**Environment:** ${{ matrix.environment }}" >> ${DRIFT_REPORT}
+          echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> ${DRIFT_REPORT}
+          echo "**Cluster:** ${{ env.CLUSTER_NAME }}" >> ${DRIFT_REPORT}
+          echo "" >> ${DRIFT_REPORT}
+          
+          # Function to compare resources
+          compare_resource() {
+            local resource_type=$1
+            local cluster_file=$2
+            local helm_file=$3
+            
+            echo "Comparing ${resource_type}..."
+            
+            if [ -f "${cluster_file}" ] && [ -f "${helm_file}" ]; then
+              # Use kubectl diff to compare (it's aware of k8s semantics)
+              DIFF_OUTPUT=$(diff -u ${helm_file} ${cluster_file} 2>&1 || true)
+              
+              if [ -n "${DIFF_OUTPUT}" ]; then
+                echo "## ⚠️ Drift detected in ${resource_type}" >> ${DRIFT_REPORT}
+                echo "" >> ${DRIFT_REPORT}
+                echo '```diff' >> ${DRIFT_REPORT}
+                echo "${DIFF_OUTPUT}" | head -n 100 >> ${DRIFT_REPORT}  # Limit output
+                echo '```' >> ${DRIFT_REPORT}
+                echo "" >> ${DRIFT_REPORT}
+                DRIFT_DETECTED=true
+              fi
+            fi
+          }
+          # Compare different resource types
+          compare_resource "Deployments" "/tmp/cluster-deployments.yaml" "/tmp/helm-output/job-board/templates/backend/deployment.yaml"
+          compare_resource "Services" "/tmp/cluster-services.yaml" "/tmp/helm-output/job-board/templates/backend/service.yaml"
+          compare_resource "Ingress" "/tmp/cluster-ingress.yaml" "/tmp/helm-output/job-board/templates/ingress.yaml"
+          
+          # Check for unexpected resources
+          echo "## Additional Resources in Cluster" >> ${DRIFT_REPORT}
+          echo "" >> ${DRIFT_REPORT}
+          
+          EXTRA_DEPLOYMENTS=$(kubectl get deployments -n job-board --no-headers 2>/dev/null | wc -l)
+          EXPECTED_DEPLOYMENTS=2  # backend and frontend
+          
+          if [ ${EXTRA_DEPLOYMENTS} -gt ${EXPECTED_DEPLOYMENTS} ]; then
+            echo "⚠️ Found ${EXTRA_DEPLOYMENTS} deployments, expected ${EXPECTED_DEPLOYMENTS}" >> ${DRIFT_REPORT}
+            kubectl get deployments -n job-board >> ${DRIFT_REPORT}
+            DRIFT_DETECTED=true
+          else
+            echo "✅ No unexpected deployments" >> ${DRIFT_REPORT}
+          fi
+          echo "" >> ${DRIFT_REPORT}
+          
+          # Set output
+          if [ "${DRIFT_DETECTED}" = "true" ]; then
+            echo "drift=true" >> $GITHUB_OUTPUT
+            echo "✅ Drift detected" >> ${DRIFT_REPORT}
+          else
+            echo "drift=false" >> $GITHUB_OUTPUT
+            echo "✅ No drift detected" >> ${DRIFT_REPORT}
+          fi
+          
+          # Save report as artifact
+          cat ${DRIFT_REPORT}
