@@ -1,6 +1,4 @@
-# ==================== SECURITY GROUP RULES ====================
-
-# Create the ALB security group
+# ==================== ALB SECURITY GROUP ====================
 resource "aws_security_group" "alb" {
   name        = "${var.cluster_name}-alb"
   description = "Security group for Application Load Balancer"
@@ -35,7 +33,7 @@ resource "aws_security_group" "alb" {
   }
 }
 
-# Get BOTH security groups
+# ==================== DATA SOURCES ====================
 data "aws_security_group" "cluster_sg" {
   id = module.eks.cluster_security_group_id
 }
@@ -44,6 +42,7 @@ data "aws_security_group" "node_sg" {
   id = module.eks.cluster_primary_security_group_id
 }
 
+# ==================== SECURITY GROUP RULES ====================
 # Rules for CLUSTER security group (pods use this)
 resource "aws_security_group_rule" "alb_to_frontend_cluster" {
   description              = "Allow ALB to access frontend pods on port 3000"
@@ -53,8 +52,7 @@ resource "aws_security_group_rule" "alb_to_frontend_cluster" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.alb.id
   security_group_id        = data.aws_security_group.cluster_sg.id
-
-  depends_on = [module.eks]
+  depends_on               = [module.eks]
 }
 
 resource "aws_security_group_rule" "alb_to_backend_cluster" {
@@ -65,11 +63,10 @@ resource "aws_security_group_rule" "alb_to_backend_cluster" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.alb.id
   security_group_id        = data.aws_security_group.cluster_sg.id
-
-  depends_on = [module.eks]
+  depends_on               = [module.eks]
 }
 
-# Rules for NODE security group (keep these too)
+# Rules for NODE security group
 resource "aws_security_group_rule" "alb_to_frontend_node" {
   description              = "Allow ALB to access frontend on nodes"
   type                     = "ingress"
@@ -78,8 +75,7 @@ resource "aws_security_group_rule" "alb_to_frontend_node" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.alb.id
   security_group_id        = data.aws_security_group.node_sg.id
-
-  depends_on = [module.eks]
+  depends_on               = [module.eks]
 }
 
 resource "aws_security_group_rule" "alb_to_backend_node" {
@@ -90,6 +86,5 @@ resource "aws_security_group_rule" "alb_to_backend_node" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.alb.id
   security_group_id        = data.aws_security_group.node_sg.id
-
-  depends_on = [module.eks]
+  depends_on               = [module.eks]
 }
