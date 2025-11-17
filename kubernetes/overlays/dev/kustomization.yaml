@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Reference base configuration
+bases:
+  - ../../base
+
+# Override namespace for dev
+namespace: job-board-dev
+
+# Dev-specific labels
+commonLabels:
+  environment: dev
+
+# Override images with dev tags (updated by CI/CD)
+images:
+  - name: backend-placeholder
+    newName: YOUR_AWS_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/job-board-backend
+    newTag: dev-latest
+  - name: frontend-placeholder
+    newName: YOUR_AWS_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/job-board-frontend
+    newTag: dev-latest
+
+# ConfigMap for dev environment
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+      - NODE_ENV=development
+
+# Patches for dev-specific changes
+patchesStrategicMerge:
+  - replica-patch.yaml
+  - resource-patch.yaml
+
+# Annotations for all resources
+commonAnnotations:
+  environment: "dev"
+  managed-by: "argocd"
