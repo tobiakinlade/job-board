@@ -1,17 +1,17 @@
-name: Frontend CI/CD (Simplified)
+name: Frontend CI/CD
 
 on:
   push:
     branches:
       - develop      # Deploys to dev
-      # - main         # Deploys to staging
+      - main         # Deploys to staging
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches:
       - develop
-      # - main
+      - main
     paths:
       - 'frontend/**'
 

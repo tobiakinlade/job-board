@@ -4,14 +4,14 @@ on:
   push:
     branches:
       - develop      # Deploys to dev
-      # - main         # Deploys to staging
+      - main         # Deploys to staging
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches:
       - develop
-      # - main
+      - main
     paths:
       - 'backend/**'
 
