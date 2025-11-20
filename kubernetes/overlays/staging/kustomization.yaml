@@ -2,40 +2,42 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # Reference base configuration
-bases:
-  - ../../base
 
 # Override namespace for staging
 namespace: job-board-staging
 
 # Staging-specific labels
-commonLabels:
-  environment: staging
 
 # Override images with staging tags (updated by CI/CD)
 images:
-  - name: backend-placeholder
-    newName: YOUR_AWS_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/job-board-backend
-    newTag: staging-latest
-  - name: frontend-placeholder
-    newName: YOUR_AWS_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/job-board-frontend
-    newTag: staging-latest
+- name: backend-placeholder
+  newName: YOUR_AWS_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/job-board-backend
+  newTag: staging-latest
+- name: frontend-placeholder
+  newName: YOUR_AWS_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/job-board-frontend
+  newTag: staging-latest
 
 # ConfigMap for staging environment
 configMapGenerator:
-  - name: app-config
-    behavior: merge
-    literals:
-      - ENVIRONMENT=staging
-      - LOG_LEVEL=info
-      - NODE_ENV=production
+- behavior: merge
+  literals:
+  - ENVIRONMENT=staging
+  - LOG_LEVEL=info
+  - NODE_ENV=production
+  name: app-config
 
 # Patches for staging-specific changes
-patchesStrategicMerge:
-  - replica-patch.yaml
-  - resource-patch.yaml
 
 # Annotations for all resources
 commonAnnotations:
-  environment: "staging"
-  managed-by: "argocd"
+  environment: staging
+  managed-by: argocd
+resources:
+- ../../base
+labels:
+- includeSelectors: true
+  pairs:
+    environment: staging
+patches:
+- path: replica-patch.yaml
+- path: resource-patch.yaml

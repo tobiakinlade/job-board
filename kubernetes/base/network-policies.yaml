@@ -4,7 +4,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: postgres-deny-all
-  namespace: job-board
 spec:
   podSelector:
     matchLabels:
@@ -19,7 +18,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: postgres-allow-backend
-  namespace: job-board
 spec:
   podSelector:
     matchLabels:
@@ -41,7 +39,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: backend-allow-frontend
-  namespace: job-board
 spec:
   podSelector:
     matchLabels:
@@ -82,7 +79,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: frontend-allow-external
-  namespace: job-board
 spec:
   podSelector:
     matchLabels:

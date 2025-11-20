@@ -5,36 +5,38 @@ kind: Kustomization
 namespace: job-board
 
 # Common labels applied to all resources
-commonLabels:
-  app: job-board
-  managed-by: kustomize
 
 # Base resources - your existing YAML files
 resources:
-  - namespace.yaml
-  - configmap.yaml
-  - postgres-init-configmap.yaml
-  - secrets.yaml
-  - postgres-statefulset.yaml
-  - postgres-service.yaml
-  - backend-deployment.yaml
-  - backend-service.yaml
-  - frontend-deployment.yaml
-  - frontend-service.yaml
-  - ingress.yaml
+- namespace.yaml
+- configmap.yaml
+- postgres-init-configmap.yaml
+- secrets.yaml
+- postgres-statefulset.yaml
+- postgres-service.yaml
+- backend-deployment.yaml
+- backend-service.yaml
+- frontend-deployment.yaml
+- frontend-service.yaml
+- ingress.yaml
 
 # Images that will be updated by CI/CD
 images:
-  - name: backend-placeholder
-    newName: 1800-4838-2895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-    newTag: latest
-  - name: frontend-placeholder
-    newName: 1800-4838-2895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-    newTag: latest
+- name: backend-placeholder
+  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
+  newTag: latest
+- name: frontend-placeholder
+  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
+  newTag: latest
 
 # ConfigMap generator (optional - for environment-specific configs)
 configMapGenerator:
-  - name: app-config
-    literals:
-      - ENVIRONMENT=base
-      - LOG_LEVEL=info
+- literals:
+  - ENVIRONMENT=base
+  - LOG_LEVEL=info
+  name: app-config
+labels:
+- includeSelectors: true
+  pairs:
+    app: job-board
+    managed-by: kustomize

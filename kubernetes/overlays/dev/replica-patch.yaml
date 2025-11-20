@@ -1,4 +1,3 @@
-# Dev Environment - Single replica for cost savings
 apiVersion: apps/v1
 kind: Deployment
 metadata:

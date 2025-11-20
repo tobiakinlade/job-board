@@ -1,4 +1,3 @@
-# Dev Environment - Lower resource limits for cost savings
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -55,4 +54,4 @@ spec:
     spec:
       resources:
         requests:
-          storage: 5Gi  # Smaller storage for dev
+          storage: 5Gi
