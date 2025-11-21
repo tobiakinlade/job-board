@@ -303,3 +303,4 @@ This README provides:
 7. **Professional formatting** with emojis and sections
 
 The README effectively complements your Medium article by giving users a practical guide to deploy the project while driving traffic to your detailed technical write-up.
+# CI/CD trigger
