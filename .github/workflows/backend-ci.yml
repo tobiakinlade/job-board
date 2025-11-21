@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - 'backend/**'
+      - 'kubernetes/**'  # ← Added: triggers on kustomize changes
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches:
@@ -14,6 +15,18 @@ on:
       - main
     paths:
       - 'backend/**'
+      - 'kubernetes/**'
+  workflow_dispatch:  # ← Added: enables manual triggering
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - dev
+          - staging
 
 env:
   AWS_REGION: eu-west-2
@@ -45,7 +58,7 @@ jobs:
     name: Build and Push to ECR
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     
     outputs:
       image-tag: ${{ steps.meta.outputs.image-tag }}
@@ -69,16 +82,20 @@ jobs:
     - name: Determine environment and tag
       id: meta
       run: |
-        BRANCH_NAME=${GITHUB_REF#refs/heads/}
-        SHORT_SHA=${GITHUB_SHA::7}
-        
-        if [ "$BRANCH_NAME" = "main" ]; then
-          ENV="staging"
-          TAG="staging-${SHORT_SHA}"
+        # Check if manually triggered with specific environment
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.environment }}" != "auto" ]; then
+          ENV="${{ inputs.environment }}"
         else
-          ENV="dev"
-          TAG="dev-${SHORT_SHA}"
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          if [ "$BRANCH_NAME" = "main" ]; then
+            ENV="staging"
+          else
+            ENV="dev"
+          fi
         fi
+        
+        SHORT_SHA=${GITHUB_SHA::7}
+        TAG="${ENV}-${SHORT_SHA}"
         
         echo "environment=${ENV}" >> $GITHUB_OUTPUT
         echo "image-tag=${TAG}" >> $GITHUB_OUTPUT
@@ -128,31 +145,26 @@ jobs:
         for attempt in $(seq 1 $MAX_RETRIES); do
           echo "Attempt $attempt of $MAX_RETRIES"
           
-          # Pull latest changes
           git fetch origin
           git reset --hard origin/$BRANCH_NAME
           
-          # Update kustomization
           cd kubernetes/overlays/${ENV}
           kustomize edit set image \
             backend-placeholder=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${NEW_TAG}
           
           cd ../../..
           
-          # Check if there are changes
           if git diff --quiet kubernetes/overlays/${ENV}/kustomization.yaml; then
             echo "No changes to commit - image tag already updated"
             exit 0
           fi
           
-          # Commit
           git add kubernetes/overlays/${ENV}/kustomization.yaml
           git commit -m "🚀 Deploy backend:${NEW_TAG} to ${ENV}
 
           Commit: ${GITHUB_SHA}
           Workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           
-          # Try to push
           if git push origin $BRANCH_NAME; then
             echo "✅ Successfully pushed on attempt $attempt"
             exit 0
