@@ -1,41 +1,16 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Namespace for all resources
-namespace: job-board
-
-# Common labels applied to all resources
-
-# Base resources - your existing YAML files
 resources:
-- namespace.yaml
-- configmap.yaml
-- postgres-init-configmap.yaml
-- postgres-statefulset.yaml
-- postgres-service.yaml
-- backend-deployment.yaml
-- backend-service.yaml
-- frontend-deployment.yaml
-- frontend-service.yaml
-- ingress.yaml
+  - backend-deployment.yaml
+  - frontend-deployment.yaml
+  - postgres-statefulset.yaml
+  - backend-service.yaml
+  - frontend-service.yaml
+  - postgres-service.yaml
+  - postgres-pvc.yaml
+  - configmap.yaml
+  - ingress.yaml
 
-# Images that will be updated by CI/CD
-images:
-- name: backend-placeholder
-  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-  newTag: latest
-- name: frontend-placeholder
-  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-  newTag: latest
-
-# ConfigMap generator (optional - for environment-specific configs)
-configMapGenerator:
-- literals:
-  - ENVIRONMENT=base
-  - LOG_LEVEL=info
-  name: app-config
-labels:
-- includeSelectors: true
-  pairs:
-    app: job-board
-    managed-by: kustomize
+# NO images section here!
+# Overlays will define the actual images

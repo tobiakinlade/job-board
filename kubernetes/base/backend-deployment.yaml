@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-eks/backend:latest
+        image: backend-placeholder
         imagePullPolicy: Always
         ports:
         - containerPort: 3001
