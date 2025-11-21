@@ -14,8 +14,8 @@ images:
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
   newTag: staging-da4629b
 - name: frontend-placeholder
-  newName: YOUR_AWS_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/job-board-frontend
-  newTag: staging-latest
+  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
+  newTag: staging-d5bc23d
 
 # ConfigMap for staging environment
 configMapGenerator:
