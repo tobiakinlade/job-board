@@ -1,43 +1,29 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
-# Reference base configuration
-
-# Override namespace for dev
 namespace: job-board-dev
-
-# Dev-specific labels
-
-# Override images with dev tags (updated by CI/CD)
+resources:
+  - ../../base
 images:
-- name: backend-placeholder
-  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-  newTag: dev-4f3ae51
-- name: frontend-placeholder
-  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-  newTag: dev-4f3ae51
-
-# ConfigMap for dev environment
+  - name: backend-placeholder
+    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
+    newTag: dev-4f3ae51
+  - name: frontend-placeholder
+    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
+    newTag: dev-4f3ae51
 configMapGenerator:
-- behavior: merge
-  literals:
-  - ENVIRONMENT=development
-  - LOG_LEVEL=debug
-  - NODE_ENV=development
-  name: app-config
-
-# Patches for dev-specific changes
-
-# Annotations for all resources
+  - name: app-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+      - NODE_ENV=development
 commonAnnotations:
   environment: dev
   managed-by: argocd
-resources:
-- ../../base
 labels:
-- includeSelectors: true
-  pairs:
-    environment: dev
+  - includeSelectors: true
+    pairs:
+      environment: dev
 patches:
-- path: replica-patch.yaml
-- path: resource-patch.yaml
+  - path: replica-patch.yaml
+  - path: resource-patch.yaml
