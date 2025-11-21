@@ -11,8 +11,8 @@ namespace: job-board-staging
 # Override images with staging tags (updated by CI/CD)
 images:
 - name: backend-placeholder
-  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-  newTag: staging-dac0eac
+  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
+  newTag: staging-18c3704
 - name: frontend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
   newTag: staging-dac0eac

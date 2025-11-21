@@ -11,8 +11,8 @@ namespace: job-board-dev
 # Override images with dev tags (updated by CI/CD)
 images:
 - name: backend-placeholder
-  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-  newTag: dev-ba4d22d
+  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
+  newTag: dev-4f3ae51
 - name: frontend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
   newTag: dev-ba4d22d
