@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-eks/frontend:latest
+        image: frontend-placeholder
         imagePullPolicy: Always
         ports:
         - containerPort: 3000

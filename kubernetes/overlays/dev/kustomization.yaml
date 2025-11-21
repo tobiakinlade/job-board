@@ -12,10 +12,10 @@ namespace: job-board-dev
 images:
 - name: backend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-  newTag: dev-e2951fe
+  newTag: dev-ba4d22d
 - name: frontend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-  newTag: dev-fedb2cb
+  newTag: dev-ba4d22d
 
 # ConfigMap for dev environment
 configMapGenerator:
