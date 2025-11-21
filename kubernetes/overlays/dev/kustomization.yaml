@@ -1,29 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: job-board-dev
+namespace: job-board
 resources:
   - ../../base
 images:
   - name: backend-placeholder
     newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-    newTag: dev-4f3ae51
+    newTag: latest
   - name: frontend-placeholder
     newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-    newTag: dev-4f3ae51
-configMapGenerator:
-  - name: app-config
-    behavior: merge
-    literals:
-      - ENVIRONMENT=development
-      - LOG_LEVEL=debug
-      - NODE_ENV=development
-commonAnnotations:
-  environment: dev
-  managed-by: argocd
-labels:
-  - includeSelectors: true
-    pairs:
-      environment: dev
+    newTag: latest
 patches:
   - path: replica-patch.yaml
   - path: resource-patch.yaml

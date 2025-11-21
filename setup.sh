@@ -1,107 +1,124 @@
 #!/bin/bash
 
-echo "=========================================="
-echo "ARGOCD APPLICATION SETUP"
-echo "=========================================="
-
 cd ~/job-board
 
+echo "=========================================="
+echo "FIXING MERGE CONFLICTS"
+echo "=========================================="
+
+# Fix dev
+echo "Fixing dev kustomization..."
+cat > kubernetes/overlays/dev/kustomization.yaml <<'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: job-board-dev
+resources:
+  - ../../base
+images:
+  - name: backend-placeholder
+    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
+    newTag: dev-4f3ae51
+  - name: frontend-placeholder
+    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
+    newTag: dev-4f3ae51
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+      - NODE_ENV=development
+commonAnnotations:
+  environment: dev
+  managed-by: argocd
+labels:
+  - includeSelectors: true
+    pairs:
+      environment: dev
+patches:
+  - path: replica-patch.yaml
+  - path: resource-patch.yaml
+EOF
+
+# Fix staging
+echo "Fixing staging kustomization..."
+cat > kubernetes/overlays/staging/kustomization.yaml <<'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: job-board-staging
+resources:
+  - ../../base
+images:
+  - name: backend-placeholder
+    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
+    newTag: staging-8d6563c
+  - name: frontend-placeholder
+    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
+    newTag: staging-8d6563c
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=staging
+      - LOG_LEVEL=info
+      - NODE_ENV=production
+commonAnnotations:
+  environment: staging
+  managed-by: argocd
+labels:
+  - includeSelectors: true
+    pairs:
+      environment: staging
+patches:
+  - path: replica-patch.yaml
+  - path: resource-patch.yaml
+EOF
+
+# Validate
 echo ""
-echo "Step 1: Applying ArgoCD applications..."
-kubectl apply -f argocd/applications.yaml
+echo "Validating..."
+kustomize build kubernetes/overlays/dev > /dev/null && echo "✅ Dev valid"
+kustomize build kubernetes/overlays/staging > /dev/null && echo "✅ Staging valid"
+
+# Commit
+echo ""
+echo "Committing..."
+git add kubernetes/overlays/*/kustomization.yaml
+git commit -m "fix: Resolve merge conflicts in kustomization files"
+
+# Push
+echo ""
+echo "Pushing to develop..."
+git checkout develop
+git push origin develop
 
 echo ""
-echo "Step 2: Checking application status..."
-kubectl get applications -n argocd
+echo "Pushing to main..."
+git checkout main
+git merge develop
+git push origin main
 
+# Sync
 echo ""
-echo "Step 3: Force syncing applications..."
-kubectl patch application job-board-dev -n argocd \
-  --type merge \
-  --patch '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"develop"}}}'
+echo "Syncing ArgoCD..."
+kubectl patch application job-board-dev -n argocd --type merge -p '{"operation":{"sync":{}}}'
+kubectl patch application job-board-staging -n argocd --type merge -p '{"operation":{"sync":{}}}'
 
-kubectl patch application job-board-staging -n argocd \
-  --type merge \
-  --patch '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"main"}}}'
-
-echo ""
-echo "Step 4: Waiting for sync (90 seconds)..."
-sleep 90
-
-echo ""
-echo "Step 5: Checking namespaces..."
-kubectl get namespaces | grep job-board
-
-# If namespaces don't exist after sync, create manually
-if ! kubectl get namespace job-board-dev &>/dev/null; then
-  echo "⚠️ Dev namespace not created by ArgoCD, creating manually..."
-  kubectl create namespace job-board-dev
-fi
-
-if ! kubectl get namespace job-board-staging &>/dev/null; then
-  echo "⚠️ Staging namespace not created by ArgoCD, creating manually..."
-  kubectl create namespace job-board-staging
-fi
-
-echo ""
-echo "Step 6: Creating secrets..."
-kubectl create secret generic job-board-secrets \
-  --from-literal=postgres-database=jobboard \
-  --from-literal=postgres-user=jobboard_user \
-  --from-literal=postgres-password=dev_password_123 \
-  -n job-board-dev 2>/dev/null && echo "✅ Dev secret created" || echo "⚠️ Dev secret already exists or failed"
-
-kubectl create secret generic job-board-secrets \
-  --from-literal=postgres-database=jobboard \
-  --from-literal=postgres-user=jobboard_user \
-  --from-literal=postgres-password=staging_password_456 \
-  -n job-board-staging 2>/dev/null && echo "✅ Staging secret created" || echo "⚠️ Staging secret already exists or failed"
-
-echo ""
-echo "Step 7: Final sync to deploy all resources..."
-kubectl patch application job-board-dev -n argocd \
-  --type merge \
-  --patch '{"operation":{"sync":{}}}'
-
-kubectl patch application job-board-staging -n argocd \
-  --type merge \
-  --patch '{"operation":{"sync":{}}}'
-
-echo ""
-echo "Step 8: Waiting for deployment (60 seconds)..."
 sleep 60
 
 echo ""
-echo "=========================================="
-echo "FINAL STATUS"
-echo "=========================================="
+echo "Restarting pods..."
+kubectl delete pods --all -n job-board-dev
+kubectl delete pods --all -n job-board-staging
+
+sleep 30
 
 echo ""
-echo "ArgoCD Applications:"
+echo "=========================================="
+echo "STATUS"
+echo "=========================================="
 kubectl get applications -n argocd
-
 echo ""
-echo "Dev Namespace Resources:"
-kubectl get all -n job-board-dev
-
+kubectl get pods -n job-board-dev
 echo ""
-echo "Staging Namespace Resources:"
-kubectl get all -n job-board-staging
-
-echo ""
-echo "Dev Secrets:"
-kubectl get secrets -n job-board-dev
-
-echo ""
-echo "Staging Secrets:"
-kubectl get secrets -n job-board-staging
-
-echo ""
-echo "=========================================="
-echo "NEXT STEPS"
-echo "=========================================="
-echo "If pods show ImagePullBackOff:"
-echo "1. Check images exist in ECR"
-echo "2. Check kustomization files have correct tags"
-echo "3. Trigger workflows to build images"
-echo "4. Delete old pods: kubectl delete pods --all -n job-board-dev"
+kubectl get pods -n job-board-staging
