@@ -12,7 +12,7 @@ namespace: job-board-dev
 images:
 - name: backend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-  newTag: dev-81e5563
+  newTag: dev-b15d16b
 - name: frontend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
   newTag: dev-214fc32
