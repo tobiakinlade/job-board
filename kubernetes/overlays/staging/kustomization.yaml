@@ -15,7 +15,7 @@ images:
   newTag: staging-dac0eac
 - name: frontend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-  newTag: staging-d5bc23d
+  newTag: staging-dac0eac
 
 # ConfigMap for staging environment
 configMapGenerator:
