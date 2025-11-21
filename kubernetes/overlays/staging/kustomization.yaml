@@ -12,7 +12,7 @@ namespace: job-board-staging
 images:
 - name: backend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-  newTag: staging-9f86b48
+  newTag: staging-dac0eac
 - name: frontend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
   newTag: staging-d5bc23d
