@@ -15,7 +15,7 @@ images:
   newTag: dev-81e5563
 - name: frontend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-  newTag: dev-81e5563
+  newTag: dev-214fc32
 
 # ConfigMap for dev environment
 configMapGenerator:
