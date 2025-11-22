@@ -9,10 +9,10 @@ resources:
 images:
 - name: backend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-  newTag: d015f94
+  newTag: 3ef78d4
 - name: frontend-placeholder
   newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-  newTag: d015f94
+  newTag: 3ef78d4
 
 patches:
 - path: replica-patch.yaml
