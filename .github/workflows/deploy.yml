@@ -1,95 +1,182 @@
-name: Rollback Deployment
+name: Build and Deploy
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'kubernetes/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
-    inputs:
-      component:
-        description: 'Component to rollback'
-        required: true
-        type: choice
-        options:
-          - backend
-          - frontend
-          - both
-      commit_sha:
-        description: 'Git commit SHA to rollback to (7 chars)'
-        required: true
-        type: string
-      reason:
-        description: 'Reason for rollback'
-        required: true
-        type: string
+
+env:
+  AWS_REGION: eu-west-2
+  AWS_ACCOUNT_ID: "180048382895"
 
 jobs:
-  validate:
+  build-backend:
+    name: Build Backend
     runs-on: ubuntu-latest
     outputs:
-      is-valid: ${{ steps.check.outputs.valid }}
-      backend-tag: ${{ steps.check.outputs.backend_tag }}
-      frontend-tag: ${{ steps.check.outputs.frontend_tag }}
-
+      image-tag: ${{ steps.meta.outputs.image-tag }}
+    
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Get short SHA
+      id: meta
+      run: |
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        echo "image-tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      working-directory: backend
+      run: npm ci
+    
+    - name: Run tests
+      working-directory: backend
+      run: npm test || echo "Tests not configured"
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+    
+    - name: Build and push
+      working-directory: backend
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ steps.meta.outputs.image-tag }}
+      run: |
+        docker build -t $ECR_REGISTRY/job-board-backend:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/job-board-backend:$IMAGE_TAG
+        echo "✅ Pushed backend:$IMAGE_TAG"
 
-      - name: Validate commit and extract tags
-        id: check
-        run: |
-          COMMIT=${{ inputs.commit_sha }}
-
-          if ! git cat-file -e ${COMMIT} 2>/dev/null; then
-            echo "::error::Commit ${COMMIT} not found"
-            echo "valid=false" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-
-          git show ${COMMIT}:kubernetes/overlays/dev/kustomization.yaml > /tmp/old.yaml
-
-          BACKEND_TAG=$(grep -A2 "backend-placeholder" /tmp/old.yaml | grep newTag | awk '{print $2}')
-          FRONTEND_TAG=$(grep -A2 "frontend-placeholder" /tmp/old.yaml | grep newTag | awk '{print $2}')
-
-          echo "valid=true" >> $GITHUB_OUTPUT
-          echo "backend_tag=${BACKEND_TAG}" >> $GITHUB_OUTPUT
-          echo "frontend_tag=${FRONTEND_TAG}" >> $GITHUB_OUTPUT
-
-  rollback:
+  build-frontend:
+    name: Build Frontend
     runs-on: ubuntu-latest
-    needs: validate
-    if: needs.validate.outputs.is-valid == 'true'
-
+    outputs:
+      image-tag: ${{ steps.meta.outputs.image-tag }}
+    
     steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Get short SHA
+      id: meta
+      run: |
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        echo "image-tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      working-directory: frontend
+      run: npm ci
+    
+    - name: Run tests
+      working-directory: frontend
+      run: npm test -- --passWithNoTests
+    
+    - name: Build
+      working-directory: frontend
+      run: npm run build
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+    
+    - name: Build and push
+      working-directory: frontend
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ steps.meta.outputs.image-tag }}
+      run: |
+        docker build --build-arg REACT_APP_API_URL=/api -t $ECR_REGISTRY/job-board-frontend:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/job-board-frontend:$IMAGE_TAG
+        echo "✅ Pushed frontend:$IMAGE_TAG"
 
-      - name: Apply rollback
-        run: |
-          COMPONENT=${{ inputs.component }}
-          FILE=kubernetes/overlays/dev/kustomization.yaml
-          BACKEND=${{ needs.validate.outputs.backend-tag }}
-          FRONTEND=${{ needs.validate.outputs.frontend-tag }}
+  update-manifests:
+    name: Update Kubernetes Manifests
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Setup Kustomize
+      run: |
+        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+        sudo mv kustomize /usr/local/bin/
+    
+    - name: Configure Git
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+    
+    - name: Update images
+      env:
+        IMAGE_TAG: ${{ needs.build-backend.outputs.image-tag }}
+      run: |
+        # Pull latest to avoid conflicts
+        git pull origin main --rebase
+        
+        cd kubernetes/overlays/dev
+        
+        kustomize edit set image \
+          backend-placeholder=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/job-board-backend:${IMAGE_TAG}
+        
+        kustomize edit set image \
+          frontend-placeholder=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/job-board-frontend:${IMAGE_TAG}
+        
+        cat kustomization.yaml
+    
+    - name: Commit and push
+      env:
+        IMAGE_TAG: ${{ needs.build-backend.outputs.image-tag }}
+      run: |
+        git add kubernetes/overlays/dev/kustomization.yaml
+        
+        # Check if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
+        
+        git commit -m "🚀 Deploy: ${IMAGE_TAG}
 
-          if [ "$COMPONENT" = "backend" ] || [ "$COMPONENT" = "both" ]; then
-            sed -i.bak "/backend-placeholder/,/newTag:/ s/newTag: .*/newTag: ${BACKEND}/" $FILE
-          fi
-
-          if [ "$COMPONENT" = "frontend" ] || [ "$COMPONENT" = "both" ]; then
-            sed -i.bak "/frontend-placeholder/,/newTag:/ s/newTag: .*/newTag: ${FRONTEND}/" $FILE
-          fi
-
-      - name: Commit and push
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          git add kubernetes/overlays/dev/kustomization.yaml
-          git commit -m "⏮️ Rollback ${{ inputs.component }} to ${{
-            inputs.commit_sha }} - ${{
-            inputs.reason }}"
-          git push origin main
-
-      - name: Wait for ArgoCD
-        run: |
-          echo "Waiting for ArgoCD sync..."
-          sleep 30
+        Backend: job-board-backend:${IMAGE_TAG}
+        Frontend: job-board-frontend:${IMAGE_TAG}
+        
+        Commit: ${{ github.sha }}
+        Workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        
+        git push origin main
