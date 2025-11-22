@@ -4,16 +4,16 @@ kind: Kustomization
 namespace: job-board
 
 resources:
-  - ../../base
+- ../../base
 
 images:
-  - name: backend-placeholder
-    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-    newTag: initial
-  - name: frontend-placeholder
-    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-    newTag: initial
+- name: backend-placeholder
+  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
+  newTag: 810457a
+- name: frontend-placeholder
+  newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
+  newTag: 810457a
 
 patches:
-  - path: replica-patch.yaml
-  - path: resource-patch.yaml
+- path: replica-patch.yaml
+- path: resource-patch.yaml
