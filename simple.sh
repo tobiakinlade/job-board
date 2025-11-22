@@ -3,104 +3,57 @@
 cd ~/job-board
 
 echo "=========================================="
-echo "FIXING RESOURCE-PATCH.YAML"
+echo "COMPLETE FIX - FORCE CORRECT STORAGECLASS"
 echo "=========================================="
 
 echo ""
-echo "Step 1: Updating resource-patch.yaml with accessModes..."
-cat > kubernetes/overlays/dev/resource-patch.yaml <<'EOF'
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: backend
-spec:
-  template:
-    spec:
-      containers:
-      - name: backend
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: frontend
-spec:
-  template:
-    spec:
-      containers:
-      - name: frontend
-        resources:
-          requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            cpu: 250m
-            memory: 256Mi
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: postgres
-spec:
-  template:
-    spec:
-      containers:
-      - name: postgres
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
-  volumeClaimTemplates:
-  - metadata:
-      name: postgres-data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: gp3
-      resources:
-        requests:
-          storage: 5Gi
-EOF
+echo "Step 1: Updating local files to ebs-gp3..."
+sed -i '' 's/storageClassName: gp3/storageClassName: ebs-gp3/g' kubernetes/overlays/dev/resource-patch.yaml
+sed -i '' 's/storageClassName: gp3/storageClassName: ebs-gp3/g' kubernetes/base/postgres-statefulset.yaml
 
 echo ""
-echo "Step 2: Testing kustomize build..."
-kustomize build kubernetes/overlays/dev > /tmp/test.yaml
-
-if grep -A 10 "volumeClaimTemplates:" /tmp/test.yaml | grep -q "ReadWriteOnce"; then
-  echo "✅ accessModes present in build!"
-else
-  echo "❌ accessModes still missing in build!"
-  echo "Showing volumeClaimTemplates section:"
-  grep -A 15 "volumeClaimTemplates:" /tmp/test.yaml
-  exit 1
-fi
+echo "Verifying:"
+grep storageClassName kubernetes/overlays/dev/resource-patch.yaml
+grep storageClassName kubernetes/base/postgres-statefulset.yaml
 
 echo ""
-echo "Step 3: Committing and pushing..."
-git add kubernetes/overlays/dev/resource-patch.yaml
-git commit -m "fix: Add accessModes and storageClassName to postgres volumeClaimTemplates patch"
+echo "Step 2: Committing and pushing..."
+git add kubernetes/
+git commit -m "fix: Use ebs-gp3 StorageClass (not gp3)" 2>/dev/null || echo "Already committed"
 git push origin main
 
 echo ""
-echo "Step 4: Cleaning up old resources..."
+echo "Step 3: Force deleting old PVC..."
+kubectl patch pvc postgres-data-postgres-0 -n job-board -p '{"metadata":{"finalizers":null}}' 2>/dev/null
+kubectl delete pvc postgres-data-postgres-0 -n job-board --force --grace-period=0 2>/dev/null
+
+echo ""
+echo "Step 4: Deleting StatefulSet..."
 kubectl delete statefulset postgres -n job-board 2>/dev/null
-kubectl delete pvc postgres-data-postgres-0 -n job-board 2>/dev/null
 
 echo ""
-echo "Step 5: Forcing ArgoCD sync..."
-kubectl patch application job-board -n argocd --type merge -p '{"operation":{"sync":{}}}'
+echo "Step 5: Deleting and recreating ArgoCD application..."
+kubectl delete application job-board -n argocd
+sleep 5
+kubectl apply -f argocd/applications.yaml
 
 echo ""
-echo "Step 6: Waiting for deployment (90 seconds)..."
-sleep 90
+echo "Step 6: Recreating secret..."
+kubectl delete secret job-board-secrets -n job-board 2>/dev/null
+kubectl create secret generic job-board-secrets \
+  --from-literal=DB_HOST=postgres \
+  --from-literal=DB_PORT=5432 \
+  --from-literal=DB_NAME=jobboard \
+  --from-literal=DB_USER=jobboard_user \
+  --from-literal=DB_PASSWORD=secure_password_123 \
+  --from-literal=POSTGRES_DB=jobboard \
+  --from-literal=POSTGRES_USER=jobboard_user \
+  --from-literal=POSTGRES_PASSWORD=secure_password_123 \
+  -n job-board
+
+echo ""
+echo "Step 7: Waiting for full deployment (120 seconds)..."
+sleep 120
 
 echo ""
 echo "=========================================="
@@ -111,16 +64,21 @@ echo ""
 kubectl get pvc -n job-board
 
 echo ""
-if kubectl get pod postgres-0 -n job-board >/dev/null 2>&1; then
-  STATUS=$(kubectl get pod postgres-0 -n job-board -o jsonpath='{.status.phase}')
-  echo "🎉 postgres-0 EXISTS! Status: $STATUS"
-  
-  if [ "$STATUS" = "Running" ]; then
-    echo ""
-    echo "✅✅✅ SUCCESS! ALL PODS RUNNING! ✅✅✅"
-    kubectl get pods -n job-board
-  fi
+PVC_SC=$(kubectl get pvc postgres-data-postgres-0 -n job-board -o jsonpath='{.spec.storageClassName}' 2>/dev/null)
+if [ "$PVC_SC" = "ebs-gp3" ]; then
+  echo "✅ PVC using correct StorageClass: ebs-gp3"
+  PVC_STATUS=$(kubectl get pvc postgres-data-postgres-0 -n job-board -o jsonpath='{.status.phase}')
+  echo "PVC Status: $PVC_STATUS"
 else
-  echo "⚠️ postgres-0 not created yet"
-  kubectl describe statefulset postgres -n job-board | tail -20
+  echo "❌ PVC still using wrong StorageClass: $PVC_SC"
+fi
+
+echo ""
+RUNNING=$(kubectl get pods -n job-board --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
+echo "Pods Running: $RUNNING / 3"
+
+if [ "$RUNNING" -eq 3 ]; then
+  echo ""
+  echo "🎉🎉🎉 SUCCESS! ALL PODS RUNNING! 🎉🎉🎉"
+  kubectl get pods -n job-board
 fi
