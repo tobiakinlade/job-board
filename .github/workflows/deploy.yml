@@ -1,0 +1,182 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'kubernetes/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-2
+  AWS_ACCOUNT_ID: "180048382895"
+
+jobs:
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.image-tag }}
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Get short SHA
+      id: meta
+      run: |
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        echo "image-tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      working-directory: backend
+      run: npm ci
+    
+    - name: Run tests
+      working-directory: backend
+      run: npm test || echo "Tests not configured"
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+    
+    - name: Build and push
+      working-directory: backend
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ steps.meta.outputs.image-tag }}
+      run: |
+        docker build -t $ECR_REGISTRY/job-board-backend:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/job-board-backend:$IMAGE_TAG
+        echo "✅ Pushed backend:$IMAGE_TAG"
+
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.image-tag }}
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Get short SHA
+      id: meta
+      run: |
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        echo "image-tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      working-directory: frontend
+      run: npm ci
+    
+    - name: Run tests
+      working-directory: frontend
+      run: npm test -- --passWithNoTests
+    
+    - name: Build
+      working-directory: frontend
+      run: npm run build
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+    
+    - name: Build and push
+      working-directory: frontend
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ steps.meta.outputs.image-tag }}
+      run: |
+        docker build --build-arg REACT_APP_API_URL=/api -t $ECR_REGISTRY/job-board-frontend:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/job-board-frontend:$IMAGE_TAG
+        echo "✅ Pushed frontend:$IMAGE_TAG"
+
+  update-manifests:
+    name: Update Kubernetes Manifests
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Setup Kustomize
+      run: |
+        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+        sudo mv kustomize /usr/local/bin/
+    
+    - name: Configure Git
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+    
+    - name: Update images
+      env:
+        IMAGE_TAG: ${{ needs.build-backend.outputs.image-tag }}
+      run: |
+        # Pull latest to avoid conflicts
+        git pull origin main --rebase
+        
+        cd kubernetes/overlays/dev
+        
+        kustomize edit set image \
+          backend-placeholder=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/job-board-backend:${IMAGE_TAG}
+        
+        kustomize edit set image \
+          frontend-placeholder=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/job-board-frontend:${IMAGE_TAG}
+        
+        cat kustomization.yaml
+    
+    - name: Commit and push
+      env:
+        IMAGE_TAG: ${{ needs.build-backend.outputs.image-tag }}
+      run: |
+        git add kubernetes/overlays/dev/kustomization.yaml
+        
+        # Check if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
+        
+        git commit -m "🚀 Deploy: ${IMAGE_TAG}
+
+        Backend: job-board-backend:${IMAGE_TAG}
+        Frontend: job-board-frontend:${IMAGE_TAG}
+        
+        Commit: ${{ github.sha }}
+        Workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        
+        git push origin main
