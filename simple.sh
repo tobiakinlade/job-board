@@ -1,84 +1,40 @@
 #!/bin/bash
 
-cd ~/job-board
+ALB_SG1="sg-02483ced23a8c4d2e"
+ALB_SG2="sg-0524ff83ef79c47b6"
+NODE_SG="sg-0940b04e910f0f4bf"
 
 echo "=========================================="
-echo "COMPLETE FIX - FORCE CORRECT STORAGECLASS"
+echo "COMPLETE SECURITY GROUP FIX"
 echo "=========================================="
 
-echo ""
-echo "Step 1: Updating local files to ebs-gp3..."
-sed -i '' 's/storageClassName: gp3/storageClassName: ebs-gp3/g' kubernetes/overlays/dev/resource-patch.yaml
-sed -i '' 's/storageClassName: gp3/storageClassName: ebs-gp3/g' kubernetes/base/postgres-statefulset.yaml
+# Allow internet to ALB
+for SG in $ALB_SG1 $ALB_SG2; do
+  aws ec2 authorize-security-group-ingress --group-id $SG --protocol tcp --port 80 --cidr 0.0.0.0/0 --region eu-west-2 2>/dev/null
+done
+echo "✅ ALB can accept internet traffic"
+
+# Allow ALB to nodes (port 3000 frontend)
+for SG in $ALB_SG1 $ALB_SG2; do
+  aws ec2 authorize-security-group-ingress --group-id $NODE_SG --protocol tcp --port 3000 --source-group $SG --region eu-west-2 2>/dev/null
+done
+echo "✅ ALB can reach frontend (3000)"
+
+# Allow ALB to nodes (port 3001 backend)
+for SG in $ALB_SG1 $ALB_SG2; do
+  aws ec2 authorize-security-group-ingress --group-id $NODE_SG --protocol tcp --port 3001 --source-group $SG --region eu-west-2 2>/dev/null
+done
+echo "✅ ALB can reach backend (3001)"
 
 echo ""
-echo "Verifying:"
-grep storageClassName kubernetes/overlays/dev/resource-patch.yaml
-grep storageClassName kubernetes/base/postgres-statefulset.yaml
+echo "Waiting 60 seconds for health checks..."
+sleep 60
 
 echo ""
-echo "Step 2: Committing and pushing..."
-git add kubernetes/
-git commit -m "fix: Use ebs-gp3 StorageClass (not gp3)" 2>/dev/null || echo "Already committed"
-git push origin main
+echo "TARGET HEALTH:"
+aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:eu-west-2:180048382895:targetgroup/k8s-jobboard-backends-e1345d2dd5/e903bf25ab22960a --region eu-west-2 --query 'TargetHealthDescriptions[].{IP:Target.Id,State:TargetHealth.State}' --output table
+aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:eu-west-2:180048382895:targetgroup/k8s-jobboard-frontend-24f874168d/d1416251b7a42276 --region eu-west-2 --query 'TargetHealthDescriptions[].{IP:Target.Id,State:TargetHealth.State}' --output table
 
 echo ""
-echo "Step 3: Force deleting old PVC..."
-kubectl patch pvc postgres-data-postgres-0 -n job-board -p '{"metadata":{"finalizers":null}}' 2>/dev/null
-kubectl delete pvc postgres-data-postgres-0 -n job-board --force --grace-period=0 2>/dev/null
-
-echo ""
-echo "Step 4: Deleting StatefulSet..."
-kubectl delete statefulset postgres -n job-board 2>/dev/null
-
-echo ""
-echo "Step 5: Deleting and recreating ArgoCD application..."
-kubectl delete application job-board -n argocd
-sleep 5
-kubectl apply -f argocd/applications.yaml
-
-echo ""
-echo "Step 6: Recreating secret..."
-kubectl delete secret job-board-secrets -n job-board 2>/dev/null
-kubectl create secret generic job-board-secrets \
-  --from-literal=DB_HOST=postgres \
-  --from-literal=DB_PORT=5432 \
-  --from-literal=DB_NAME=jobboard \
-  --from-literal=DB_USER=jobboard_user \
-  --from-literal=DB_PASSWORD=secure_password_123 \
-  --from-literal=POSTGRES_DB=jobboard \
-  --from-literal=POSTGRES_USER=jobboard_user \
-  --from-literal=POSTGRES_PASSWORD=secure_password_123 \
-  -n job-board
-
-echo ""
-echo "Step 7: Waiting for full deployment (120 seconds)..."
-sleep 120
-
-echo ""
-echo "=========================================="
-echo "FINAL STATUS"
-echo "=========================================="
-kubectl get all -n job-board
-echo ""
-kubectl get pvc -n job-board
-
-echo ""
-PVC_SC=$(kubectl get pvc postgres-data-postgres-0 -n job-board -o jsonpath='{.spec.storageClassName}' 2>/dev/null)
-if [ "$PVC_SC" = "ebs-gp3" ]; then
-  echo "✅ PVC using correct StorageClass: ebs-gp3"
-  PVC_STATUS=$(kubectl get pvc postgres-data-postgres-0 -n job-board -o jsonpath='{.status.phase}')
-  echo "PVC Status: $PVC_STATUS"
-else
-  echo "❌ PVC still using wrong StorageClass: $PVC_SC"
-fi
-
-echo ""
-RUNNING=$(kubectl get pods -n job-board --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
-echo "Pods Running: $RUNNING / 3"
-
-if [ "$RUNNING" -eq 3 ]; then
-  echo ""
-  echo "🎉🎉🎉 SUCCESS! ALL PODS RUNNING! 🎉🎉🎉"
-  kubectl get pods -n job-board
-fi
+echo "TESTING APPLICATION:"
+curl -I http://k8s-jobboard-jobboard-388e5e11ff-321396029.eu-west-2.elb.amazonaws.com 2>/dev/null | head -1

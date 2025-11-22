@@ -103,19 +103,20 @@ function App() {
       padding: '20px',
     },
     header: {
-      backgroundColor: '#2c3e50',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // �� CHANGED!
       color: 'white',
       padding: '30px 20px',
       marginBottom: '30px',
       borderRadius: '8px',
       textAlign: 'center',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', // Added shadow
     },
     title: {
       fontSize: '2.5em',
       marginBottom: '10px',
     },
     buttonPrimary: {
-      backgroundColor: '#3498db',
+      backgroundColor: '#ff6b6b', // 🎨 CHANGED to coral/red!
       color: 'white',
       border: 'none',
       padding: '12px 24px',
@@ -123,6 +124,7 @@ function App() {
       cursor: 'pointer',
       fontSize: '16px',
       marginTop: '10px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2)', // Added shadow
     },
     jobGrid: {
       display: 'grid',
@@ -137,11 +139,12 @@ function App() {
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
       cursor: 'pointer',
       transition: 'transform 0.2s',
+      border: '2px solid #f0f0f0', // Added border
     },
     jobTitle: {
       fontSize: '1.5em',
       marginBottom: '10px',
-      color: '#2c3e50',
+      color: '#667eea', // 🎨 CHANGED to match header!
     },
     jobCompany: {
       fontSize: '1.1em',
@@ -222,8 +225,8 @@ function App() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={styles.title}>Job Board</h1>
-        <p>Find your dream job today</p>
+        <h1 style={styles.title}>🚀 Job Board v2.0</h1>
+        <p>Find your dream job today - Now with improved design!</p>
         <button style={styles.buttonPrimary} onClick={() => setShowJobForm(true)}>
           Post a Job
         </button>
@@ -395,5 +398,3 @@ function App() {
 }
 
 export default App;
-// CI trigger
-// CI trigger
