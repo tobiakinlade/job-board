@@ -1,124 +1,36 @@
 #!/bin/bash
+set +e  # Don't exit on errors
 
-cd ~/job-board
+echo "Fast Cleanup - No waiting"
 
-echo "=========================================="
-echo "FIXING MERGE CONFLICTS"
-echo "=========================================="
+# Delete ArgoCD app first (stops sync loop)
+kubectl delete application job-board -n argocd --wait=false 2>/dev/null
+kubectl patch application job-board -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null
 
-# Fix dev
-echo "Fixing dev kustomization..."
-cat > kubernetes/overlays/dev/kustomization.yaml <<'EOF'
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: job-board-dev
-resources:
-  - ../../base
-images:
-  - name: backend-placeholder
-    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-    newTag: dev-4f3ae51
-  - name: frontend-placeholder
-    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-    newTag: dev-4f3ae51
-configMapGenerator:
-  - name: app-config
-    behavior: merge
-    literals:
-      - ENVIRONMENT=development
-      - LOG_LEVEL=debug
-      - NODE_ENV=development
-commonAnnotations:
-  environment: dev
-  managed-by: argocd
-labels:
-  - includeSelectors: true
-    pairs:
-      environment: dev
-patches:
-  - path: replica-patch.yaml
-  - path: resource-patch.yaml
-EOF
+# Force delete namespaces immediately
+kubectl delete namespace job-board --grace-period=0 --force --wait=false 2>/dev/null
+kubectl delete namespace argocd --grace-period=0 --force --wait=false 2>/dev/null
 
-# Fix staging
-echo "Fixing staging kustomization..."
-cat > kubernetes/overlays/staging/kustomization.yaml <<'EOF'
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: job-board-staging
-resources:
-  - ../../base
-images:
-  - name: backend-placeholder
-    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-backend
-    newTag: staging-8d6563c
-  - name: frontend-placeholder
-    newName: 180048382895.dkr.ecr.eu-west-2.amazonaws.com/job-board-frontend
-    newTag: staging-8d6563c
-configMapGenerator:
-  - name: app-config
-    behavior: merge
-    literals:
-      - ENVIRONMENT=staging
-      - LOG_LEVEL=info
-      - NODE_ENV=production
-commonAnnotations:
-  environment: staging
-  managed-by: argocd
-labels:
-  - includeSelectors: true
-    pairs:
-      environment: staging
-patches:
-  - path: replica-patch.yaml
-  - path: resource-patch.yaml
-EOF
+# Remove finalizers (this is the key!)
+kubectl get namespace job-board -o json 2>/dev/null | jq '.spec.finalizers=[]' | kubectl replace --raw "/api/v1/namespaces/job-board/finalize" -f - 2>/dev/null
+kubectl get namespace argocd -o json 2>/dev/null | jq '.spec.finalizers=[]' | kubectl replace --raw "/api/v1/namespaces/argocd/finalize" -f - 2>/dev/null
 
-# Validate
-echo ""
-echo "Validating..."
-kustomize build kubernetes/overlays/dev > /dev/null && echo "✅ Dev valid"
-kustomize build kubernetes/overlays/staging > /dev/null && echo "✅ Staging valid"
-
-# Commit
-echo ""
-echo "Committing..."
-git add kubernetes/overlays/*/kustomization.yaml
-git commit -m "fix: Resolve merge conflicts in kustomization files"
-
-# Push
-echo ""
-echo "Pushing to develop..."
-git checkout develop
-git push origin develop
-
-echo ""
-echo "Pushing to main..."
-git checkout main
-git merge develop
-git push origin main
-
-# Sync
-echo ""
-echo "Syncing ArgoCD..."
-kubectl patch application job-board-dev -n argocd --type merge -p '{"operation":{"sync":{}}}'
-kubectl patch application job-board-staging -n argocd --type merge -p '{"operation":{"sync":{}}}'
-
-sleep 60
-
-echo ""
-echo "Restarting pods..."
-kubectl delete pods --all -n job-board-dev
-kubectl delete pods --all -n job-board-staging
-
+echo "Waiting 30 seconds for K8s cleanup..."
 sleep 30
 
-echo ""
-echo "=========================================="
-echo "STATUS"
-echo "=========================================="
-kubectl get applications -n argocd
-echo ""
-kubectl get pods -n job-board-dev
-echo ""
-kubectl get pods -n job-board-staging
+# AWS cleanup (fast - don't wait for responses)
+echo "Cleaning AWS resources..."
+aws elbv2 describe-load-balancers --region eu-west-2 --query "LoadBalancers[?contains(LoadBalancerName, 'k8s')].LoadBalancerArn" --output text 2>/dev/null | xargs -n1 -I{} aws elbv2 delete-load-balancer --load-balancer-arn {} --region eu-west-2 2>/dev/null &
+
+sleep 20
+
+aws elbv2 describe-target-groups --region eu-west-2 --query "TargetGroups[?contains(TargetGroupName, 'k8s')].TargetGroupArn" --output text 2>/dev/null | xargs -n1 -I{} aws elbv2 delete-target-group --target-group-arn {} --region eu-west-2 2>/dev/null &
+
+sleep 10
+
+# Terraform destroy
+echo "Running terraform destroy..."
+cd terraform/ 2>/dev/null
+terraform destroy -auto-approve -lock=false
+
+echo "✅ Done! Check: aws eks list-clusters --region eu-west-2"

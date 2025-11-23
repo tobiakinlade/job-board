@@ -7,7 +7,7 @@ echo "=========================================="
 
 # 1. Destroy everything
 echo "Step 1: Destroying infrastructure..."
-cd ~/job-board/terraform/eks
+cd ~/job-board/terraform/
 terraform destroy -auto-approve
 
 # 2. Recreate infrastructure
