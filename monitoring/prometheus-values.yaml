@@ -1,22 +1,15 @@
-# Prometheus Stack Configuration
+# Prometheus Stack Configuration 
 prometheus:
   prometheusSpec:
-    retention: 15d
+    retention: 7d
     resources:
       requests:
-        memory: 512Mi
-        cpu: 250m
+        memory: 256Mi
+        cpu: 100m
       limits:
-        memory: 2Gi
-        cpu: 1000m
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: ebs-gp3
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 20Gi
+        memory: 1Gi
+        cpu: 500m
+    storageSpec: {}
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
 
@@ -24,35 +17,18 @@ grafana:
   enabled: true
   adminPassword: "JobBoard2025!"
   persistence:
-    enabled: true
-    storageClassName: ebs-gp3
-    size: 10Gi
+    enabled: false
   
-  datasources:
-    datasources.yaml:
-      apiVersion: 1
-      datasources:
-        - name: Prometheus
-          type: prometheus
-          url: http://prometheus-kube-prometheus-prometheus:9090
-          access: proxy
-          isDefault: true
-        - name: Loki
-          type: loki
-          url: http://loki:3100
-          access: proxy
+  # Remove custom datasources - let the chart handle defaults
+  sidecar:
+    datasources:
+      enabled: true
+      defaultDatasourceEnabled: true
 
 alertmanager:
   enabled: true
   alertmanagerSpec:
-    storage:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: ebs-gp3
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 5Gi
+    storage: {}
 
 nodeExporter:
   enabled: true
@@ -60,12 +36,11 @@ nodeExporter:
 kubeStateMetrics:
   enabled: true
 
-# Reduce resource usage for dev environment
 prometheusOperator:
   resources:
     requests:
-      cpu: 100m
-      memory: 100Mi
+      cpu: 50m
+      memory: 64Mi
     limits:
-      cpu: 200m
-      memory: 200Mi
+      cpu: 100m
+      memory: 128Mi
