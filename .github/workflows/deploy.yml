@@ -62,8 +62,8 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ steps.meta.outputs.image-tag }}
       run: |
-        docker build -t $ECR_REGISTRY/job-board-backend:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/job-board-backend:$IMAGE_TAG
+        docker build -t $ECR_REGISTRY/job-board-eks/backend:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/job-board-eks/backend:$IMAGE_TAG
         echo "✅ Pushed backend:$IMAGE_TAG"
 
   build-frontend:
@@ -116,8 +116,8 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ steps.meta.outputs.image-tag }}
       run: |
-        docker build --build-arg REACT_APP_API_URL=/api -t $ECR_REGISTRY/job-board-frontend:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/job-board-frontend:$IMAGE_TAG
+        docker build --build-arg REACT_APP_API_URL=/api -t $ECR_REGISTRY/job-board-eks/frontend:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/job-board-eks/frontend:$IMAGE_TAG
         echo "✅ Pushed frontend:$IMAGE_TAG"
 
   update-manifests:
@@ -152,10 +152,10 @@ jobs:
         cd kubernetes/overlays/dev
         
         kustomize edit set image \
-          backend-placeholder=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/job-board-backend:${IMAGE_TAG}
+          backend-placeholder=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/job-board-eks/backend:${IMAGE_TAG}
         
         kustomize edit set image \
-          frontend-placeholder=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/job-board-frontend:${IMAGE_TAG}
+          frontend-placeholder=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/job-board-eks/frontend:${IMAGE_TAG}
         
         cat kustomization.yaml
     

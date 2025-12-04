@@ -5,6 +5,6 @@ terraform {
     key            = "eks/terraform.tfstate"
     region         = "eu-west-2"
     encrypt        = true
-    dynamodb_table = "terraform-state-lock"       # Create this table first
+    dynamodb_table = "job-board-terraform-state-lock"       # Create this table first
   }
 }

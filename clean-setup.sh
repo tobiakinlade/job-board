@@ -6,14 +6,10 @@ echo "CLEAN ROOM SETUP TEST"
 echo "=========================================="
 
 # 1. Destroy everything
-echo "Step 1: Destroying infrastructure..."
+echo "Step 1: Provisioning infrastructure..."
 cd ~/job-board/terraform/
-terraform destroy -auto-approve
 
-# 2. Recreate infrastructure
-echo ""
-echo "Step 2: Creating infrastructure..."
-terraform apply -auto-approve
+
 
 # 3. Update kubeconfig
 echo ""
@@ -33,7 +29,7 @@ kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -
 # 5. Create application
 echo ""
 echo "Step 5: Creating ArgoCD application..."
-kubectl apply -f ~/job-board/argocd/applications.yaml
+kubectl apply -f argocd/applications.yaml
 
 # 6. Create secrets
 echo ""
