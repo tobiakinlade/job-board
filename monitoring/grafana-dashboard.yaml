@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: job-board-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  job-board-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "title": "Job Board Overview",
+      "uid": "job-board-overview",
+      "version": 1,
+      "panels": [
+        {
+          "id": 1,
+          "title": "Pods Running",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+          "targets": [
+            {
+              "expr": "count(kube_pod_status_phase{namespace=\"job-board\", phase=\"Running\"} == 1)",
+              "legendFormat": "Running Pods"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  {"color": "red", "value": null},
+                  {"color": "yellow", "value": 2},
+                  {"color": "green", "value": 3}
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 2,
+          "title": "Pod Restarts (1h)",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"job-board\"}[1h]))",
+              "legendFormat": "Restarts"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 1},
+                  {"color": "red", "value": 5}
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 3,
+          "title": "CPU Usage",
+          "type": "gauge",
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+          "targets": [
+            {
+              "expr": "avg(rate(container_cpu_usage_seconds_total{namespace=\"job-board\"}[5m])) * 100",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 60},
+                  {"color": "red", "value": 80}
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 4,
+          "title": "Memory Usage",
+          "type": "gauge",
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+          "targets": [
+            {
+              "expr": "avg(container_memory_usage_bytes{namespace=\"job-board\"} / container_spec_memory_limit_bytes{namespace=\"job-board\"}) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 60},
+                  {"color": "red", "value": 85}
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 5,
+          "title": "Pod CPU Usage Over Time",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total{namespace=\"job-board\", container!=\"\"}[5m]) * 100",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {"unit": "percent"}
+          }
+        },
+        {
+          "id": 6,
+          "title": "Pod Memory Usage Over Time",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+          "targets": [
+            {
+              "expr": "container_memory_usage_bytes{namespace=\"job-board\", container!=\"\"} / 1024 / 1024",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {"unit": "decmbytes"}
+          }
+        },
+        {
+          "id": 7,
+          "title": "Network Receive",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+          "targets": [
+            {
+              "expr": "rate(container_network_receive_bytes_total{namespace=\"job-board\"}[5m])",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {"unit": "Bps"}
+          }
+        },
+        {
+          "id": 8,
+          "title": "Network Transmit",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+          "targets": [
+            {
+              "expr": "rate(container_network_transmit_bytes_total{namespace=\"job-board\"}[5m])",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {"unit": "Bps"}
+          }
+        }
+      ],
+      "time": {"from": "now-1h", "to": "now"},
+      "refresh": "30s",
+      "schemaVersion": 38
+    }
