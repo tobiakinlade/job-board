@@ -24,9 +24,8 @@ This project demonstrates a complete DevOps workflow for deploying and managing 
 ---
 
 ## 🏗️ Architecture
-/job-board-CI_CD-HLD.jpg
-
-/observability-HLD.png
+![Job Board CI/CD HLD](./job-board-CI_CD-HLD.jpg)
+![Observability HLD](./observability-HLD.png)
 ---
 
 ## 🚀 Quick Start
