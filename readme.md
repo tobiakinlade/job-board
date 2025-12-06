@@ -1,308 +1,327 @@
-# Job Board - Full Stack Application on AWS EKS
+# Job Board - Production-Grade Kubernetes Deployment
 
-A production-ready full-stack job board application deployed on AWS Elastic Kubernetes Service (EKS) using Kubernetes, Terraform, and modern DevOps practices.
+A complete 3-part series demonstrating production-ready deployment practices on AWS EKS with Infrastructure as Code, GitOps CI/CD, and full observability.
 
-## 📋 Project Overview
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat&logo=kubernetes&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-232F3E?style=flat&logo=amazon-aws&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=flat&logo=terraform&logoColor=white)
+![ArgoCD](https://img.shields.io/badge/ArgoCD-EF7B4D?style=flat&logo=argo&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=flat&logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat&logo=grafana&logoColor=white)
 
-This project demonstrates a complete cloud-native application deployment featuring:
+---
 
-- **Frontend**: React.js job board interface
-- **Backend**: Node.js/Express REST API
-- **Database**: PostgreSQL with persistent storage
-- **Infrastructure**: AWS EKS cluster managed with Terraform
-- **CI/CD**: Automated deployment pipelines
+## 📋 Overview
+
+This project demonstrates a complete DevOps workflow for deploying and managing a Job Board application on AWS EKS:
+
+| Part | Focus | Technologies |
+|------|-------|--------------|
+| **Part 1** | Infrastructure | Terraform, AWS EKS, VPC, IAM |
+| **Part 2** | CI/CD Pipeline | GitHub Actions, ArgoCD, Kustomize |
+| **Part 3** | Observability | Prometheus, Grafana, Loki, Alertmanager |
+
+---
 
 ## 🏗️ Architecture
+./job-board-CI_CD-HLD.jpg
 
-![Architecture Diagram](./architecture.png)
-
-### High-Level Components:
-- **Layer 1**: Application Load Balancer (Public Entry Point)
-- **Layer 2**: React Frontend & Node.js Backend (Application Layer)
-- **Layer 3**: PostgreSQL Database (Data Layer)
-- **Security**: Kubernetes Network Policies, IAM Roles, Security Groups
-
-### AWS Resources:
-- ✅ EKS Cluster (Managed Kubernetes)
-- ✅ EC2 Worker Nodes (Auto-scaling)
-- ✅ ECR Repositories (Private Docker Registry)
-- ✅ VPC with Public/Private Subnets
-- ✅ Application Load Balancer
-- ✅ EBS Volumes (Persistent Storage)
-- ✅ IAM Roles & Policies
+./ observability-HLD.png
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- **AWS Account** with appropriate permissions
-- **AWS CLI** configured with credentials
-- **kubectl** - Kubernetes command-line tool
-- **Terraform** (>= 1.0)
-- **Docker**
+- AWS CLI configured with appropriate permissions
+- Terraform >= 1.0
+- kubectl
+- Helm 3
+- Docker
 
-### Installation & Deployment
+### 1. Clone the Repository
 
-#### 1. Clone the Repository
 ```bash
-git clone https://github.com/tobiakinLade/job-board
+git clone https://github.com/tobiakinlade/job-board.git
 cd job-board
+```
 
-2. Infrastructure Provisioning
-bash
+### 2. Deploy Infrastructure (Part 1)
 
+```bash
 cd terraform
 terraform init
-terraform plan
-terraform apply -auto-approve
+terraform apply --auto-approve
+```
 
-3. Configure Kubernetes Access
-bash
+### 3. Configure kubectl
 
-aws eks update-kubeconfig --region eu-west-2 --name job-board-eks
-kubectl get nodes  # Verify cluster connection
+```bash
+aws eks update-kubeconfig --name job-board-eks --region eu-west-2
+```
 
-4. Build and Push Docker Images
-bash
+### 4. Install ArgoCD (Part 2)
 
-chmod +x push-to-ecr.sh
-./push-to-ecr.sh
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -f argocd/applications.yaml
+```
 
-5. Deploy to Kubernetes
-bash
+### 5. Create Application Secrets
 
-chmod +x deploy-to-eks.sh
-./deploy-to-eks.sh
+```bash
+kubectl create namespace job-board
+kubectl create secret generic job-board-secrets \
+  --from-literal=DB_HOST=postgres-service \
+  --from-literal=DB_PORT=5432 \
+  --from-literal=DB_NAME=jobboard \
+  --from-literal=DB_USER=jobboard_user \
+  --from-literal=DB_PASSWORD=your_secure_password \
+  --from-literal=POSTGRES_DB=jobboard \
+  --from-literal=POSTGRES_USER=jobboard_user \
+  --from-literal=POSTGRES_PASSWORD=your_secure_password \
+  -n job-board
+```
 
-6. Access Your Application
-bash
+### 6. Deploy Monitoring Stack (Part 3)
 
-kubectl get ingress job-board-ingress -n job-board
-# Use the provided URL to access your job board
+```bash
+# Add Helm repos
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
 
-📁 Project Structure
-text
+# Create monitoring namespace
+kubectl create namespace monitoring
 
+# Install Prometheus Stack
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --values monitoring/prometheus-values.yaml
+
+# Install Loki Stack
+helm install loki grafana/loki-stack \
+  --namespace monitoring \
+  --set loki.persistence.enabled=false \
+  --set promtail.enabled=true \
+  --set grafana.enabled=false
+
+# Apply monitoring configurations
+kubectl apply -f monitoring/grafana-datasource-loki.yaml
+kubectl apply -f monitoring/servicemonitor.yaml
+kubectl apply -f monitoring/prometheus-rules.yaml
+kubectl apply -f monitoring/grafana-dashboard.yaml
+kubectl apply -f monitoring/alertmanager-config.yaml
+
+# Restart Grafana to load new configs
+kubectl rollout restart deployment prometheus-grafana -n monitoring
+```
+
+---
+
+## 📁 Project Structure
+
+```
 job-board/
-├── frontend/                 # React application
+├── terraform/                    # Infrastructure as Code
+│   ├── main.tf                   # Main Terraform configuration
+│   ├── variables.tf              # Variable definitions
+│   ├── outputs.tf                # Output values
+│   └── modules/                  # Terraform modules
+│
+├── kubernetes/                   # Kubernetes manifests
+│   ├── base/                     # Base Kustomize resources
+│   │   ├── frontend-deployment.yaml
+│   │   ├── backend-deployment.yaml
+│   │   ├── postgres-statefulset.yaml
+│   │   ├── services.yaml
+│   │   └── kustomization.yaml
+│   └── overlays/                 # Environment-specific overlays
+│       └── dev/
+│           └── kustomization.yaml
+│
+├── argocd/                       # ArgoCD configuration
+│   └── applications.yaml         # ArgoCD Application manifest
+│
+├── monitoring/                   # Observability stack
+│   ├── prometheus-values.yaml    # Prometheus Helm values
+│   ├── grafana-datasource-loki.yaml
+│   ├── servicemonitor.yaml       # ServiceMonitor definitions
+│   ├── prometheus-rules.yaml     # Alert rules
+│   ├── grafana-dashboard.yaml    # Custom dashboards
+│   └── alertmanager-config.yaml  # Alertmanager configuration
+│
+├── backend/                      # Node.js API
 │   ├── src/
-│   ├── public/
+│   ├── Dockerfile
 │   └── package.json
-├── backend/                  # Node.js/Express API
+│
+├── frontend/                     # React application
 │   ├── src/
-│   ├── routes/
-│   └── package.json
-├── terraform/               # Infrastructure as Code
-│   ├── main.tf
-│   ├── variables.tf
-│   └── outputs.tf
-├── kubernetes/              # Kubernetes manifests
-│   ├── namespace.yaml
-│   ├── configmap.yaml
-│   ├── secrets.yaml
-│   ├── pvc.yaml
-│   ├── postgres-statefulset.yaml
-│   ├── backend-deployment.yaml
-│   ├── frontend-deployment.yaml
-│   ├── ingress.yaml
-│   └── network-policies.yaml
-├── scripts/
-│   ├── push-to-ecr.sh
-│   └── deploy-to-eks.sh
-└── docker-compose.yml       # Local development
+│   ├── Dockerfile
+│   └── nginx.conf
+│
+├── .github/workflows/            # CI/CD pipelines
+│   └── deploy.yml                # GitHub Actions workflow
+│
+└── scripts/                      # Automation scripts
+    ├── clean-setup.sh            # Full deployment script
+    └── setup-monitoring.sh       # Monitoring setup script
+```
 
-🔧 Kubernetes Resources
+---
 
-The application uses the following Kubernetes resources in dependency order:
+## 🔧 Components
 
-    Namespace - Logical isolation
+### Part 1: Infrastructure (Terraform)
 
-    ConfigMap & Secrets - Application configuration
+| Resource | Description |
+|----------|-------------|
+| VPC | Custom VPC with public/private subnets |
+| EKS Cluster | Managed Kubernetes cluster |
+| Node Groups | t3.medium instances (2 nodes) |
+| ECR | Container image repositories |
+| IAM Roles | IRSA for EBS CSI and Load Balancer Controller |
+| EBS CSI Driver | Persistent volume support |
+| AWS Load Balancer Controller | ALB ingress support |
 
-    PersistentVolumeClaim - Database storage
+### Part 2: CI/CD Pipeline
 
-    StatefulSet - PostgreSQL database
+| Component | Purpose |
+|-----------|---------|
+| GitHub Actions | Build and push Docker images |
+| ArgoCD | GitOps continuous deployment |
+| Kustomize | Environment-specific configurations |
+| ECR | Container registry |
 
-    Deployment - Backend API
+### Part 3: Observability
 
-    Deployment - Frontend application
+| Component | Purpose |
+|-----------|---------|
+| Prometheus | Metrics collection and storage |
+| Grafana | Visualization and dashboards |
+| Loki | Log aggregation |
+| Promtail | Log shipping |
+| Alertmanager | Alert routing to Slack |
+| ServiceMonitors | Automatic scrape target discovery |
+| PrometheusRules | Alert definitions and SLOs |
 
-    Service - Internal networking
+---
 
-    Ingress - External access (ALB)
+## 📊 Accessing the Stack
 
-    NetworkPolicy - Security rules
+### Application
 
-🛠️ Development
-Local Development
-bash
+```bash
+# Get the ALB URL
+kubectl get ingress -n job-board
+```
 
-docker-compose up
+### Grafana
 
-Access the application at http://localhost:3000
-Environment Variables
+```bash
+kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
+# URL: http://localhost:3000
+# Username: admin
+# Password: (from prometheus-values.yaml)
+```
 
-Create .env files for local development:
+### Prometheus
 
-    frontend/.env
+```bash
+kubectl port-forward svc/prometheus-kube-prometheus-prometheus -n monitoring 9090:9090
+# URL: http://localhost:9090
+```
 
-    backend/.env
+### Alertmanager
 
-Testing
-bash
+```bash
+kubectl port-forward svc/prometheus-kube-prometheus-alertmanager -n monitoring 9093:9093
+# URL: http://localhost:9093
+```
 
-# Backend tests
-cd backend
-npm test
+### ArgoCD
 
-# Frontend tests
-cd frontend
-npm test
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+# URL: https://localhost:8080
+# Username: admin
+# Password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+```
 
-📚 Detailed Guide
+---
 
-For a complete step-by-step deployment guide with explanations of each component, check out the full article:
+## 🚨 Alert Rules
 
-Deploying a Full-Stack Application to AWS EKS: A Complete Kubernetes Guide
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| JobBoardPodNotReady | Pod not ready for 5m | Warning |
+| JobBoardPodRestartingFrequently | >3 restarts in 1h | Warning |
+| JobBoardHighMemoryUsage | Memory >85% for 5m | Warning |
+| JobBoardHighCPUUsage | CPU >80% for 5m | Warning |
+| JobBoardDeploymentReplicasMismatch | Replicas unavailable for 5m | Critical |
+| JobBoardPVCAlmostFull | PVC >85% full | Warning |
+| JobBoardSLOAvailabilityBreach | Availability <99.9% | Critical |
 
-The guide covers:
+---
 
-    Kubernetes resource dependencies and deployment order
+## 💰 Cost Estimation
 
-    AWS EKS integration and best practices
+| Resource | Monthly Cost (Approx) |
+|----------|----------------------|
+| EKS Control Plane | $73 |
+| EC2 Nodes (2x t3.medium) | $60 |
+| NAT Gateway | $32 |
+| Application Load Balancer | $16 |
+| EBS Volumes | $10 |
+| **Total** | **~$190/month** |
 
-    Network security with Calico policies
+**Tip:** Destroy resources when not in use:
 
-    Infrastructure as Code with Terraform
-
-    Production deployment strategies
-
-🎯 Features
-
-    Job Listings: Browse and search job opportunities
-
-    Job Posting: Create new job listings
-
-    Responsive Design: Mobile-friendly React interface
-
-    RESTful API: Clean backend architecture
-
-    Persistent Data: PostgreSQL with EBS storage
-
-    Auto-scaling: Horizontal Pod Autoscaler ready
-
-    Load Balancing: AWS ALB with path-based routing
-
-    Security: Network policies, IAM roles, encrypted storage
-
-🔒 Security
-
-    Kubernetes Network Policies restrict pod-to-pod communication
-
-    IAM Roles for Service Accounts (IRSA) for fine-grained AWS permissions
-
-    Security Groups control network access
-
-    Secrets management for sensitive data
-
-    Private ECR repositories for Docker images
-
-📈 Monitoring & Logging
-bash
-
-# View application logs
-kubectl logs -l app=backend -n job-board -f
-kubectl logs -l app=frontend -n job-board -f
-
-# Check resource usage
-kubectl top pods -n job-board
-kubectl top nodes
-
-🧹 Cleanup
-
-To avoid ongoing charges, destroy the infrastructure:
-bash
-
-# Delete Kubernetes resources
-kubectl delete namespace job-board --ignore-not-found=true
-
-# Destroy Terraform infrastructure
+```bash
 cd terraform
-terraform destroy -auto-approve
+terraform destroy --auto-approve
+```
 
-🐛 Troubleshooting
+---
 
-Common issues and solutions:
-Pods in CrashLoopBackOff
-bash
+## 📚 Blog Series
 
-kubectl describe pod <pod-name> -n job-board
-kubectl logs <pod-name> -n job-board
+- [Part 1: Building Production-Grade EKS Infrastructure with Terraform](https://medium.com/@tobiakinlade)
+- [Part 2: Kubernetes CI/CD Pipeline with GitOps](https://medium.com/@tobiakinlade)
+- [Part 3: Production-Grade Observability for AWS EKS](https://medium.com/@tobiakinlade)
 
-Database Connection Issues
+---
 
-    Verify DB_HOST in ConfigMap matches service name
+## 🛠️ Troubleshooting
 
-    Check PostgreSQL logs: kubectl logs -l app=postgres -n job-board
+| Issue | Solution |
+|-------|----------|
+| ALB returning 504 | Add security group rules for ports 3000/3001 |
+| ServiceMonitor not discovered | Ensure `release: prometheus` label exists |
+| Grafana CrashLoopBackOff | Check for duplicate default datasources |
+| Loki not receiving logs | Verify Promtail pods are running |
+| ArgoCD sync failing | Check application logs and Git credentials |
 
-ALB Not Provisioning
+---
 
-    Check Ingress resource: kubectl get ingress -n job-board
+## 🤝 Contributing
 
-    Verify AWS Load Balancer Controller is installed
+Contributions are welcome! Please open an issue or submit a pull request.
 
-Image Pull Errors
+---
 
-    Re-authenticate with ECR: aws ecr get-login-password --region eu-west-2 | docker login...
+## 📄 License
 
-    Verify image exists in ECR repository
+This project is licensed under the MIT License.
 
-🤝 Contributing
+---
 
-    Fork the repository
+## 👤 Author
 
-    Create a feature branch: git checkout -b feature/new-feature
+**Oluwatobi Akinlade**
 
-    Commit your changes: git commit -am 'Add new feature'
-
-    Push to the branch: git push origin feature/new-feature
-
-    Submit a pull request
-
-📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-👨‍💻 Author
-
-Tobi Akinlade
-
-    Medium: @tobi.akinlade.co
-
-    GitHub: @tobiakinlade
-
-🙏 Acknowledgments
-
-    AWS EKS team for managed Kubernetes service
-
-    Kubernetes community for excellent documentation
-
-    Terraform for Infrastructure as Code capabilities
-
-⭐ If you found this project helpful, please give it a star!
-text
-
-
-This README provides:
-
-1. **Clear project overview** and architecture
-2. **Step-by-step deployment instructions**
-3. **Direct link to your Medium article** for detailed explanations
-4. **Comprehensive project structure**
-5. **Troubleshooting section** for common issues
-6. **Cleanup instructions** to avoid AWS charges
-7. **Professional formatting** with emojis and sections
-
-The README effectively complements your Medium article by giving users a practical guide to deploy the project while driving traffic to your detailed technical write-up.
-# CI/CD trigger
-# CI trigger 1763740032
-# CI trigger 1763743816
+- LinkedIn: [linkedin.com/in/tobiakinlade](https://linkedin.com/in/tobiakinlade)
+- Medium: [medium.com/@tobiakinlade](https://medium.com/@tobiakinlade)
+- GitHub: [github.com/tobiakinlade](https://github.com/tobiakinlade)
